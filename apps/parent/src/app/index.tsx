@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import { MapPanel, type MapPanelHandle } from "../components/map-panel";
 import { ChildReport } from "../components/child-report";
-import { registerForPush } from "../../lib/push";
+import { registerForPush, presentSosAlert } from "../../lib/push";
 import { supabase } from "../../lib/supabase";
 import { useTheme, type Theme } from "../theme";
 import {
@@ -144,7 +144,29 @@ function Dashboard() {
   const [name, setName] = useState("");
   const mapRef = useRef<MapPanelHandle>(null);
   const lastTap = useRef<{ id: string; t: number }>({ id: "", t: 0 });
+  const lastSosId = useRef<string | null>(null);
   const [reportChild, setReportChild] = useState<ChildWithLocation | null>(null);
+
+  // Detect a fresh SOS (via realtime OR poll). Vibrate + notify + alert once.
+  async function checkSos(initial = false) {
+    const feed = await fetchSos(1).catch(() => []);
+    const last = feed[0];
+    if (!last) return;
+    if (initial) {
+      lastSosId.current = last.id; // baseline: don't alert for past SOS on open
+      return;
+    }
+    if (last.id !== lastSosId.current && !last.resolved_at) {
+      lastSosId.current = last.id;
+      presentSosAlert(last.child_name);
+      Alert.alert("🆘 SOS", `${last.child_name} a déclenché une alerte SOS !`, [
+        { text: "Plus tard", style: "cancel" },
+        { text: "Marquer résolu", onPress: () => resolveSos(last.id).catch(() => {}) },
+      ]);
+    } else {
+      lastSosId.current = last.id;
+    }
+  }
 
   function onChildPress(item: ChildWithLocation) {
     const now = Date.now();
@@ -174,7 +196,12 @@ function Dashboard() {
 
   useEffect(() => {
     refresh();
-    const poll = setInterval(refresh, 15_000);
+    checkSos(true); // baseline so we don't re-alert past SOS on open
+    // Poll: auto-detect position updates AND new SOS even without realtime.
+    const poll = setInterval(() => {
+      refresh();
+      checkSos();
+    }, 15_000);
     const unsubs: Array<() => void> = [];
     try {
       unsubs.push(subscribeLocations(refresh));
@@ -188,18 +215,7 @@ function Dashboard() {
           }
         })
       );
-      unsubs.push(
-        subscribeSos(async () => {
-          const feed = await fetchSos(1).catch(() => []);
-          const last = feed[0];
-          if (last && !last.resolved_at) {
-            Alert.alert("🆘 SOS", `${last.child_name} a déclenché une alerte SOS !`, [
-              { text: "Plus tard", style: "cancel" },
-              { text: "Marquer résolu", onPress: () => resolveSos(last.id).catch(() => {}) },
-            ]);
-          }
-        })
-      );
+      unsubs.push(subscribeSos(() => checkSos()));
     } catch (e: any) {
       console.warn("realtime subscribe failed:", e?.message);
     }

@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Platform, Vibration } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
@@ -13,6 +13,26 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+/** Strong local alert on the parent device when a child SOS arrives:
+ *  vibrate hard + fire a high-priority local notification with sound. */
+export async function presentSosAlert(childName: string): Promise<void> {
+  try {
+    Vibration.vibrate([0, 600, 300, 600, 300, 900]);
+  } catch {}
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🆘 SOS",
+        body: `${childName} a déclenché une alerte SOS !`,
+        sound: true,
+        vibrate: [0, 600, 300, 600],
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      },
+      trigger: null, // immediate
+    });
+  } catch {}
+}
 
 /** Register this device for push and store the Expo token on the parent profile. */
 export async function registerForPush(): Promise<void> {
