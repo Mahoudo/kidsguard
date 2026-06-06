@@ -3,6 +3,7 @@ import { Component, useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -126,7 +127,17 @@ function AppInner() {
 
   useEffect(() => {
     if (!childId) return;
-    startCommandListener(childId);
+    startCommandListener(childId, {
+      onCall: (room) => {
+        Alert.alert("📹 Appel", "Tes parents veulent t'appeler.", [
+          { text: "Plus tard", style: "cancel" },
+          {
+            text: "Répondre",
+            onPress: () => Linking.openURL(`https://meet.jit.si/${room}`),
+          },
+        ]);
+      },
+    });
     getLockState().then(setLocked);
     const unsubLock = subscribeLock(childId, setLocked);
     return () => {

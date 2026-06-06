@@ -121,6 +121,21 @@ export function subscribeLocations(onChange: () => void) {
   };
 }
 
+/** Build a unique Jitsi room name for a child. */
+export function callRoom(childId: string): string {
+  return `KidsGuard-${childId.replace(/-/g, "").slice(0, 12)}-${Date.now().toString(36)}`;
+}
+
+/** Start a consented video call: notify the child + return the Jitsi room. */
+export async function startCall(childId: string): Promise<string> {
+  const room = callRoom(childId);
+  const { error } = await supabase
+    .from("commands")
+    .insert({ child_id: childId, type: "call", payload: { room } });
+  if (error) throw error;
+  return room;
+}
+
 /** Send a command (ring, locate_now) to a child device. */
 export async function sendCommand(
   childId: string,

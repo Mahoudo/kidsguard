@@ -34,8 +34,11 @@ function stopSiren() {
   }
 }
 
-/** Listen for parent commands (ring / stop_ring) addressed to this child. */
-export function startCommandListener(childId: string) {
+/** Listen for parent commands (ring / stop_ring / call) addressed to this child. */
+export function startCommandListener(
+  childId: string,
+  opts?: { onCall?: (room: string) => void }
+) {
   if (channel) return;
   channel = supabase
     .channel(`commands-${childId}`)
@@ -48,14 +51,20 @@ export function startCommandListener(childId: string) {
         filter: `child_id=eq.${childId}`,
       },
       async (payload) => {
-        const cmd = payload.new as { id: string; type: string };
+        const cmd = payload.new as {
+          id: string;
+          type: string;
+          payload?: { room?: string };
+        };
         if (cmd.type === "ring") {
           await playSiren();
-          // auto-stop after 30s
           if (stopTimer) clearTimeout(stopTimer);
           stopTimer = setTimeout(stopSiren, 30_000);
         } else if (cmd.type === "stop_ring") {
           stopSiren();
+        } else if (cmd.type === "call") {
+          const room = cmd.payload?.room;
+          if (room) opts?.onCall?.(room);
         }
         await supabase
           .from("commands")

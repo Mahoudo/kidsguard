@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Linking,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +25,7 @@ import {
   redeemGuardianInvite,
   setChildLock,
   setEmergencyPhone,
+  startCall,
   fetchChildren,
   fetchGeofenceFeed,
   fetchPlaces,
@@ -401,6 +403,19 @@ function Dashboard() {
                 </TouchableOpacity>
                 {!item.pairing_code && (
                   <>
+                    <TouchableOpacity
+                      style={s.ring}
+                      onPress={async () => {
+                        try {
+                          const room = await startCall(item.id);
+                          Linking.openURL(`https://meet.jit.si/${room}`);
+                        } catch (e: any) {
+                          Alert.alert("Erreur", e.message);
+                        }
+                      }}
+                    >
+                      <Text style={s.ringText}>📹</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={s.ring}
                       onPress={async () => {
