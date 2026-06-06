@@ -141,6 +141,26 @@ export async function fetchUsage(childId: string): Promise<UsageRow[]> {
   return (data ?? []) as UsageRow[];
 }
 
+export interface UsageDay {
+  day: string;
+  total_ms: number;
+}
+
+/** Daily screen-time totals over a date range (for weekly summaries). */
+export async function fetchUsageRange(
+  childId: string,
+  from: string,
+  to: string
+): Promise<UsageDay[]> {
+  const { data, error } = await supabase.rpc("usage_range", {
+    p_child: childId,
+    p_from: from,
+    p_to: to,
+  });
+  if (error) throw error;
+  return (data ?? []) as UsageDay[];
+}
+
 // ---- Geofencing -----------------------------------------------------------
 
 export interface PlaceOverview {

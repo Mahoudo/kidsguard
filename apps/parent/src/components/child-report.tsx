@@ -11,19 +11,24 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, type Theme } from "../theme";
 import {
+  fetchCheckins,
   fetchChildTrack,
   fetchChildren,
   fetchGeofenceFeed,
   fetchPlaces,
   fetchSos,
   fetchUsage,
+  fetchUsageRange,
+  type CheckinEvent,
   type ChildWithLocation,
   type GeofenceEvent,
   type SosEvent,
   type TrackPoint,
+  type UsageDay,
   type UsageRow,
 } from "../../lib/api";
 import { computeSecurityScore } from "../../lib/score";
+import { generateSummary } from "../../lib/summary";
 
 interface Props {
   childId: string;
@@ -41,18 +46,28 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   const [sos, setSos] = useState<SosEvent[]>([]);
   const [usage, setUsage] = useState<UsageRow[]>([]);
   const [zonesCount, setZonesCount] = useState(0);
+  const [checkins, setCheckins] = useState<CheckinEvent[]>([]);
+  const [usageWeek, setUsageWeek] = useState<UsageDay[]>([]);
+  const [period, setPeriod] = useState<"day" | "week">("day");
 
   useEffect(() => {
     (async () => {
       setLoading(true);
+      const today = new Date();
+      const to = today.toISOString().slice(0, 10);
+      const from = new Date(today.getTime() - 6 * 86400000)
+        .toISOString()
+        .slice(0, 10);
       try {
-        const [kids, t, g, s, u, pl] = await Promise.all([
+        const [kids, t, g, s, u, pl, ck, uw] = await Promise.all([
           fetchChildren().catch(() => []),
           fetchChildTrack(childId, 50).catch(() => []),
-          fetchGeofenceFeed(100).catch(() => []),
+          fetchGeofenceFeed(200).catch(() => []),
           fetchSos(50).catch(() => []),
           fetchUsage(childId).catch(() => []),
           fetchPlaces().catch(() => []),
+          fetchCheckins(100).catch(() => []),
+          fetchUsageRange(childId, from, to).catch(() => []),
         ]);
         setInfo(kids.find((k) => k.id === childId) ?? null);
         setTrack(t);
@@ -60,6 +75,8 @@ export function ChildReport({ childId, childName, onClose }: Props) {
         setSos(s.filter((e) => e.child_id === childId));
         setUsage(u);
         setZonesCount(pl.length);
+        setCheckins(ck.filter((c) => c.child_id === childId));
+        setUsageWeek(uw);
       } finally {
         setLoading(false);
       }
@@ -90,6 +107,30 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   });
   const barColor = (v: number) =>
     v >= 80 ? "#21C97A" : v >= 60 ? "#FFA726" : "#FF4D6D";
+
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const weekAgo = Date.now() - 7 * 86400000;
+  const inPeriod = (iso: string) => {
+    const ts = new Date(iso).getTime();
+    return period === "day" ? ts >= startToday.getTime() : ts >= weekAgo;
+  };
+  const geoP = geo.filter((e) => inPeriod(e.occurred_at));
+  const sosP = sos.filter((e) => inPeriod(e.created_at));
+  const checkP = checkins.filter((c) => inPeriod(c.created_at));
+  const screenP =
+    period === "day" ? totalScreen : usageWeek.reduce((a, b) => a + b.total_ms, 0);
+  const summary = generateSummary({
+    name: childName,
+    period,
+    enters: geoP.filter((e) => e.direction === "enter").map((e) => ({ place: e.place_name })),
+    exits: geoP.filter((e) => e.direction === "exit").map((e) => ({ place: e.place_name })),
+    sos: sosP.map((x) => ({ resolved: !!x.resolved_at })),
+    checkins: checkP.length,
+    screenMs: screenP,
+    topApp: usage[0]?.app_name ?? null,
+    activeDays: period === "week" ? usageWeek.length : undefined,
+  });
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <View style={st.stat}>
@@ -145,6 +186,32 @@ export function ChildReport({ childId, childName, onClose }: Props) {
                 </View>
                 <Text style={st.barVal}>{p.value}</Text>
               </View>
+            ))}
+          </View>
+
+          <View style={st.summaryCard}>
+            <View style={st.sumHead}>
+              <Text style={st.sumTitle}>{summary.title}</Text>
+              <View style={st.toggle}>
+                <TouchableOpacity
+                  onPress={() => setPeriod("day")}
+                  style={[st.toggleBtn, period === "day" && st.toggleOn]}
+                >
+                  <Text style={[st.toggleTxt, period === "day" && st.toggleTxtOn]}>Jour</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setPeriod("week")}
+                  style={[st.toggleBtn, period === "week" && st.toggleOn]}
+                >
+                  <Text style={[st.toggleTxt, period === "week" && st.toggleTxtOn]}>Semaine</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <Text style={st.sumNarrative}>{summary.narrative}</Text>
+            {summary.lines.map((l, idx) => (
+              <Text key={idx} style={st.sumLine}>
+                {l}
+              </Text>
             ))}
           </View>
 
@@ -274,6 +341,28 @@ function makeStyles(t: Theme) {
     },
     barFill: { height: 8, borderRadius: 4 },
     barVal: { fontSize: 12, fontWeight: "700", color: t.text, width: 26, textAlign: "right" },
+    summaryCard: {
+      backgroundColor: t.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    sumHead: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    sumTitle: { fontSize: 15, fontWeight: "800", color: t.text },
+    toggle: { flexDirection: "row", backgroundColor: t.cardAlt, borderRadius: 999, padding: 3 },
+    toggleBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 },
+    toggleOn: { backgroundColor: t.primary },
+    toggleTxt: { fontSize: 12, fontWeight: "700", color: t.muted },
+    toggleTxtOn: { color: "#fff" },
+    sumNarrative: { fontSize: 13.5, color: t.text, lineHeight: 20, marginBottom: 10 },
+    sumLine: { fontSize: 13, color: t.muted, lineHeight: 22 },
     statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
     stat: {
       flex: 1,
