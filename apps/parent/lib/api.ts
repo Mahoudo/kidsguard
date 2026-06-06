@@ -162,6 +162,66 @@ export interface UsageDay {
   total_ms: number;
 }
 
+// ---- App limits + focus schedules -----------------------------------------
+
+export interface Focus {
+  study_enabled: boolean;
+  study_start: string | null;
+  study_end: string | null;
+  sleep_enabled: boolean;
+  sleep_start: string | null;
+  sleep_end: string | null;
+}
+
+export async function getFocus(childId: string): Promise<Focus | null> {
+  const { data, error } = await supabase.rpc("get_focus", { p_child: childId });
+  if (error) throw error;
+  return ((data as Focus[])?.[0]) ?? null;
+}
+
+export async function setFocus(childId: string, f: Focus): Promise<void> {
+  const { error } = await supabase.rpc("set_focus", {
+    p_child: childId,
+    p_study_enabled: f.study_enabled,
+    p_study_start: f.study_start,
+    p_study_end: f.study_end,
+    p_sleep_enabled: f.sleep_enabled,
+    p_sleep_start: f.sleep_start,
+    p_sleep_end: f.sleep_end,
+  });
+  if (error) throw error;
+}
+
+export interface AppLimit {
+  package: string;
+  app_name: string;
+  limit_min: number | null;
+  blocked: boolean;
+}
+
+export async function listAppLimits(childId: string): Promise<AppLimit[]> {
+  const { data, error } = await supabase.rpc("list_app_limits", { p_child: childId });
+  if (error) throw error;
+  return (data ?? []) as AppLimit[];
+}
+
+export async function setAppLimit(
+  childId: string,
+  pkg: string,
+  appName: string,
+  limitMin: number | null,
+  blocked: boolean
+): Promise<void> {
+  const { error } = await supabase.rpc("set_app_limit", {
+    p_child: childId,
+    p_package: pkg,
+    p_app_name: appName,
+    p_limit: limitMin,
+    p_blocked: blocked,
+  });
+  if (error) throw error;
+}
+
 /** Daily screen-time totals over a date range (for weekly summaries). */
 export async function fetchUsageRange(
   childId: string,

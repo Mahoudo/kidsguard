@@ -29,6 +29,7 @@ import {
 } from "../../lib/api";
 import { computeSecurityScore } from "../../lib/score";
 import { generateSummary } from "../../lib/summary";
+import { ChildControls } from "./child-controls";
 
 interface Props {
   childId: string;
@@ -214,6 +215,8 @@ export function ChildReport({ childId, childName, onClose }: Props) {
               </Text>
             ))}
           </View>
+
+          <ChildControls childId={childId} usage={usage} />
 
           <View style={st.statsRow}>
             <Stat label="Batterie" value={info?.last_battery_pct != null ? `${info.last_battery_pct}%` : "—"} />
