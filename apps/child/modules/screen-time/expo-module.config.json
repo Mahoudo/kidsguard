@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "ios"],
+  "android": {
+    "modules": ["expo.modules.screentime.ScreenTimeModule"]
+  },
+  "ios": {
+    "modules": ["ScreenTimeModule"]
+  }
+}
