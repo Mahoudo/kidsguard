@@ -1,6 +1,11 @@
 import type { Child } from "@kidsguard/shared";
 import { supabase } from "./supabase";
 
+// Monotonic counter so each realtime channel gets a UNIQUE name. Reusing a
+// fixed name can return an already-subscribed channel, and calling .on() on it
+// throws "cannot add postgres_changes callbacks after subscribe()" (crashes app).
+let channelSeq = 0;
+
 /** Get the parent's family, creating one on first use. */
 export async function ensureFamily(): Promise<string> {
   const { data: existing, error } = await supabase
@@ -59,7 +64,7 @@ export async function fetchChildren(): Promise<ChildWithLocation[]> {
 /** Realtime: fire onChange whenever any location row is inserted. */
 export function subscribeLocations(onChange: () => void) {
   const channel = supabase
-    .channel("locations-stream")
+    .channel(`locations-stream-${++channelSeq}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "locations" },
@@ -139,7 +144,7 @@ export async function fetchGeofenceFeed(limit = 50): Promise<GeofenceEvent[]> {
 /** Realtime: fire on every new geofence transition. */
 export function subscribeGeofence(onChange: () => void) {
   const channel = supabase
-    .channel("geofence-stream")
+    .channel(`geofence-stream-${++channelSeq}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "geofence_events" },
@@ -177,7 +182,7 @@ export async function resolveSos(id: string): Promise<void> {
 
 export function subscribeSos(onChange: () => void) {
   const channel = supabase
-    .channel("sos-stream")
+    .channel(`sos-stream-${++channelSeq}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "sos_alerts" },
