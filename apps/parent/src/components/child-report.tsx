@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme, type Theme } from "../theme";
 import {
   fetchChildTrack,
   fetchChildren,
@@ -29,6 +30,8 @@ interface Props {
 }
 
 export function ChildReport({ childId, childName, onClose }: Props) {
+  const th = useTheme();
+  const st = makeStyles(th);
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<ChildWithLocation | null>(null);
   const [track, setTrack] = useState<TrackPoint[]>([]);
@@ -58,14 +61,6 @@ export function ChildReport({ childId, childName, onClose }: Props) {
     })();
   }, [childId]);
 
-  const fmt = (iso: string) => new Date(iso).toLocaleString("fr-FR");
-  const dur = (ms: number) => {
-    const m = Math.round(ms / 60000);
-    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}min` : `${m}min`;
-  };
-  const totalScreen = usage.reduce((a, b) => a + b.total_ms, 0);
-
-  // Android hardware back closes the report (it's an overlay, not a route).
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       onClose();
@@ -74,55 +69,74 @@ export function ChildReport({ childId, childName, onClose }: Props) {
     return () => sub.remove();
   }, [onClose]);
 
+  const fmt = (iso: string) => new Date(iso).toLocaleString("fr-FR");
+  const dur = (ms: number) => {
+    const m = Math.round(ms / 60000);
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}min` : `${m}min`;
+  };
+  const totalScreen = usage.reduce((a, b) => a + b.total_ms, 0);
+
+  const Stat = ({ label, value }: { label: string; value: string }) => (
+    <View style={st.stat}>
+      <Text style={st.statVal}>{value}</Text>
+      <Text style={st.statLabel}>{label}</Text>
+    </View>
+  );
+
+  const Section = ({ title, children }: { title: string; children: ReactNode }) => (
+    <View style={st.section}>
+      <Text style={st.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
-      <View style={styles.head}>
-        <TouchableOpacity onPress={onClose} style={styles.back}>
-          <Text style={styles.backTxt}>‹ Retour</Text>
+    <SafeAreaView style={st.overlay} edges={["top", "bottom"]}>
+      <View style={st.head}>
+        <TouchableOpacity onPress={onClose} style={st.back}>
+          <Text style={st.backTxt}>‹ Retour</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>{childName}</Text>
+        <Text style={st.title}>{childName}</Text>
         <View style={{ width: 64 }} />
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6B4EE6" />
+        <View style={st.center}>
+          <ActivityIndicator size="large" color={th.primary} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <View style={styles.statsRow}>
+          <View style={st.statsRow}>
             <Stat label="Batterie" value={info?.last_battery_pct != null ? `${info.last_battery_pct}%` : "—"} />
-            <Stat label="Points" value={String(track.length)} />
+            <Stat label="Écran" value={dur(totalScreen)} />
             <Stat label="Zones" value={String(geo.length)} />
             <Stat label="SOS" value={String(sos.length)} />
           </View>
 
           <Section title="Dernière position">
             {info?.lat != null ? (
-              <Text style={styles.line}>
+              <Text style={st.line}>
                 {info.lat.toFixed(5)}, {info.lng!.toFixed(5)}
                 {"\n"}
-                <Text style={styles.muted}>
-                  {info.located_at ? fmt(info.located_at) : "—"}
-                </Text>
+                <Text style={st.muted}>{info.located_at ? fmt(info.located_at) : "—"}</Text>
               </Text>
             ) : (
-              <Text style={styles.muted}>Pas encore localisé.</Text>
+              <Text style={st.muted}>Pas encore localisé.</Text>
             )}
           </Section>
 
           <Section title={`Temps d'écran aujourd'hui (${dur(totalScreen)})`}>
             {usage.length === 0 ? (
-              <Text style={styles.muted}>
+              <Text style={st.muted}>
                 Aucune donnée. Active l'accès à l'usage sur le téléphone de l'enfant.
               </Text>
             ) : (
               usage.slice(0, 12).map((u) => (
-                <View key={u.package} style={styles.usageRow}>
-                  <Text style={styles.usageApp} numberOfLines={1}>
+                <View key={u.package} style={st.usageRow}>
+                  <Text style={st.usageApp} numberOfLines={1}>
                     {u.app_name}
                   </Text>
-                  <Text style={styles.usageDur}>{dur(u.total_ms)}</Text>
+                  <Text style={st.usageDur}>{dur(u.total_ms)}</Text>
                 </View>
               ))
             )}
@@ -130,10 +144,10 @@ export function ChildReport({ childId, childName, onClose }: Props) {
 
           <Section title={`Alertes SOS (${sos.length})`}>
             {sos.length === 0 ? (
-              <Text style={styles.muted}>Aucune.</Text>
+              <Text style={st.muted}>Aucune.</Text>
             ) : (
               sos.map((s) => (
-                <Text key={s.id} style={styles.line}>
+                <Text key={s.id} style={st.line}>
                   🆘 {fmt(s.created_at)}
                   {s.resolved_at ? " · résolu" : ""}
                 </Text>
@@ -143,12 +157,12 @@ export function ChildReport({ childId, childName, onClose }: Props) {
 
           <Section title={`Entrées/sorties de zone (${geo.length})`}>
             {geo.length === 0 ? (
-              <Text style={styles.muted}>Aucune.</Text>
+              <Text style={st.muted}>Aucune.</Text>
             ) : (
               geo.slice(0, 20).map((e) => (
-                <Text key={e.id} style={styles.line}>
+                <Text key={e.id} style={st.line}>
                   {e.direction === "enter" ? "🟢" : "🔴"} {e.place_name} ·{" "}
-                  <Text style={styles.muted}>{fmt(e.occurred_at)}</Text>
+                  <Text style={st.muted}>{fmt(e.occurred_at)}</Text>
                 </Text>
               ))
             )}
@@ -156,10 +170,10 @@ export function ChildReport({ childId, childName, onClose }: Props) {
 
           <Section title={`Historique de position (${track.length})`}>
             {track.length === 0 ? (
-              <Text style={styles.muted}>Aucun point.</Text>
+              <Text style={st.muted}>Aucun point.</Text>
             ) : (
               track.slice(0, 30).map((p, i) => (
-                <Text key={i} style={styles.lineSmall}>
+                <Text key={i} style={st.lineSmall}>
                   {fmt(p.recorded_at)} — {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
                 </Text>
               ))
@@ -171,75 +185,46 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statVal}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    overlay: { position: "absolute", inset: 0, backgroundColor: t.bg },
+    head: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.border,
+    },
+    title: { fontSize: 18, fontWeight: "800", color: t.text },
+    back: { width: 64, paddingVertical: 6, justifyContent: "center" },
+    backTxt: { fontSize: 16, color: t.primary, fontWeight: "700" },
+    center: { flex: 1, alignItems: "center", justifyContent: "center" },
+    statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
+    stat: {
+      flex: 1,
+      backgroundColor: t.cardAlt,
+      borderRadius: 14,
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    statVal: { fontSize: 17, fontWeight: "800", color: t.primary },
+    statLabel: { fontSize: 11, color: t.muted, marginTop: 2 },
+    section: { marginBottom: 18 },
+    sectionTitle: { fontSize: 15, fontWeight: "700", color: t.text, marginBottom: 8 },
+    line: { fontSize: 14, color: t.text, lineHeight: 22 },
+    lineSmall: { fontSize: 12, color: t.muted, lineHeight: 20 },
+    muted: { color: t.muted, fontSize: 12 },
+    usageRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 7,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.border,
+    },
+    usageApp: { fontSize: 14, color: t.text, flex: 1, marginRight: 10 },
+    usageDur: { fontSize: 13, fontWeight: "700", color: t.primary },
+  });
 }
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  overlay: {
-    position: "absolute",
-    inset: 0,
-    backgroundColor: "#fff",
-  },
-  head: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
-  },
-  title: { fontSize: 18, fontWeight: "800", color: "#1f2440" },
-  back: {
-    width: 64,
-    paddingVertical: 6,
-    justifyContent: "center",
-  },
-  backTxt: { fontSize: 16, color: "#6B4EE6", fontWeight: "700" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  stat: {
-    flex: 1,
-    backgroundColor: "#f6f5ff",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  statVal: { fontSize: 20, fontWeight: "800", color: "#6B4EE6" },
-  statLabel: { fontSize: 11, color: "#6b7280", marginTop: 2 },
-  section: { marginBottom: 18 },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1f2440",
-    marginBottom: 8,
-  },
-  line: { fontSize: 14, color: "#374151", lineHeight: 22 },
-  lineSmall: { fontSize: 12, color: "#6b7280", lineHeight: 20 },
-  muted: { color: "#9ca3af", fontSize: 12 },
-  usageRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 7,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#f0f0f4",
-  },
-  usageApp: { fontSize: 14, color: "#1f2440", flex: 1, marginRight: 10 },
-  usageDur: { fontSize: 13, fontWeight: "700", color: "#6B4EE6" },
-});

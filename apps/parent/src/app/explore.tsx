@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme, type Theme } from "../theme";
 import {
   fetchGeofenceFeed,
   fetchSos,
@@ -18,24 +19,12 @@ import {
 } from "../../lib/api";
 
 type Item =
-  | {
-      kind: "geo";
-      id: string;
-      at: string;
-      child: string;
-      dir: "enter" | "exit";
-      place: string;
-    }
-  | {
-      kind: "sos";
-      id: string;
-      sosId: string;
-      at: string;
-      child: string;
-      resolved: boolean;
-    };
+  | { kind: "geo"; id: string; at: string; child: string; dir: "enter" | "exit"; place: string }
+  | { kind: "sos"; id: string; sosId: string; at: string; child: string; resolved: boolean };
 
 export default function AlertsScreen() {
+  const t = useTheme();
+  const s = makeStyles(t);
   const [items, setItems] = useState<Item[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -55,13 +44,13 @@ export default function AlertsScreen() {
           dir: g.direction,
           place: g.place_name,
         })),
-        ...sos.map((s) => ({
+        ...sos.map((x) => ({
           kind: "sos" as const,
-          id: "s" + s.id,
-          sosId: s.id,
-          at: s.created_at,
-          child: s.child_name,
-          resolved: !!s.resolved_at,
+          id: "s" + x.id,
+          sosId: x.id,
+          at: x.created_at,
+          child: x.child_name,
+          resolved: !!x.resolved_at,
         })),
       ].sort((a, b) => b.at.localeCompare(a.at));
       setItems(merged);
@@ -72,7 +61,7 @@ export default function AlertsScreen() {
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, 15_000); // auto-detect new alerts
+    const poll = setInterval(load, 15_000);
     const u1 = subscribeGeofence(load);
     const u2 = subscribeSos(load);
     return () => {
@@ -92,42 +81,40 @@ export default function AlertsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.h1}>Notifications</Text>
-        <TouchableOpacity onPress={load} style={styles.refreshBtn}>
-          <Text style={styles.refreshTxt}>{refreshing ? "…" : "↻ Actualiser"}</Text>
+    <SafeAreaView style={[s.container, { backgroundColor: t.bg }]} edges={["top"]}>
+      <View style={s.header}>
+        <Text style={s.h1}>Notifications</Text>
+        <TouchableOpacity onPress={load} style={s.refreshBtn}>
+          <Text style={s.refreshTxt}>{refreshing ? "…" : "↻ Actualiser"}</Text>
         </TouchableOpacity>
       </View>
       <FlatList
         data={items}
         keyExtractor={(i) => i.id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
+        contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={load} tintColor={t.primary} />
+        }
         ListEmptyComponent={
-          <Text style={styles.muted}>
+          <Text style={s.muted}>
             Aucune notification. Crée des zones et teste un SOS depuis l'enfant.
           </Text>
         }
         renderItem={({ item }) => {
           if (item.kind === "sos") {
             return (
-              <View style={styles.row}>
-                <Text style={styles.dot}>🆘</Text>
+              <View style={[s.card, { borderColor: t.danger }]}>
+                <Text style={s.dot}>🆘</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.title}>
-                    {item.child} a déclenché un SOS
-                  </Text>
-                  <Text style={styles.muted}>
+                  <Text style={s.title}>{item.child} a déclenché un SOS</Text>
+                  <Text style={s.muted}>
                     {new Date(item.at).toLocaleString("fr-FR")}
                     {item.resolved ? " · résolu" : ""}
                   </Text>
                 </View>
                 {!item.resolved && (
-                  <TouchableOpacity
-                    onPress={() => onResolve(item.sosId)}
-                    style={styles.resolveBtn}
-                  >
-                    <Text style={styles.resolveTxt}>Résoudre</Text>
+                  <TouchableOpacity onPress={() => onResolve(item.sosId)} style={s.resolveBtn}>
+                    <Text style={s.resolveTxt}>Résoudre</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -135,16 +122,13 @@ export default function AlertsScreen() {
           }
           const enter = item.dir === "enter";
           return (
-            <View style={styles.row}>
-              <Text style={styles.dot}>{enter ? "🟢" : "🔴"}</Text>
+            <View style={s.card}>
+              <Text style={s.dot}>{enter ? "🟢" : "🔴"}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.title}>
-                  {item.child} {enter ? "arrivé(e) à" : "parti(e) de"}{" "}
-                  {item.place}
+                <Text style={s.title}>
+                  {item.child} {enter ? "arrivé(e) à" : "parti(e) de"} {item.place}
                 </Text>
-                <Text style={styles.muted}>
-                  {new Date(item.at).toLocaleString("fr-FR")}
-                </Text>
+                <Text style={s.muted}>{new Date(item.at).toLocaleString("fr-FR")}</Text>
               </View>
             </View>
           );
@@ -154,38 +138,45 @@ export default function AlertsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  h1: { fontSize: 24, fontWeight: "800", color: "#1f2440" },
-  refreshBtn: {
-    backgroundColor: "#f3f0ff",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  refreshTxt: { color: "#6B4EE6", fontWeight: "700", fontSize: 13 },
-  muted: { color: "#6b7280", fontSize: 13, marginTop: 8 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
-  },
-  dot: { fontSize: 16 },
-  title: { fontSize: 15, fontWeight: "600", color: "#1f2440" },
-  resolveBtn: {
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-  },
-  resolveTxt: { color: "#fff", fontWeight: "700", fontSize: 12 },
-});
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 8,
+    },
+    h1: { fontSize: 26, fontWeight: "900", color: t.text },
+    refreshBtn: {
+      backgroundColor: t.primarySoft,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+    refreshTxt: { color: t.primary, fontWeight: "700", fontSize: 13 },
+    muted: { color: t.muted, fontSize: 13, marginTop: 10, textAlign: "center" },
+    card: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: t.card,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    dot: { fontSize: 18 },
+    title: { fontSize: 15, fontWeight: "700", color: t.text },
+    resolveBtn: {
+      backgroundColor: t.danger,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+    resolveTxt: { color: "#fff", fontWeight: "800", fontSize: 12 },
+  });
+}
