@@ -12,7 +12,12 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { getStoredChildId, pairWithCode, unpair } from "./lib/pairing";
-import { isTracking, startTracking, stopTracking } from "./lib/location";
+import {
+  isTracking,
+  sendCurrentPosition,
+  startTracking,
+  stopTracking,
+} from "./lib/location";
 import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos } from "./lib/sos";
 import { giveConsent, hasConsent } from "./lib/consent";
@@ -63,7 +68,10 @@ function AppInner() {
       setConsent(await hasConsent());
       const id = await getStoredChildId();
       setChildId(id);
-      if (id) setTracking(await isTracking());
+      if (id) {
+        setTracking(await isTracking());
+        sendCurrentPosition(); // push a fresh position on app open
+      }
       setLoading(false);
     })();
   }, []);

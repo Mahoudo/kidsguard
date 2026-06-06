@@ -30,6 +30,31 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   }
 });
 
+/** Fetch the current position once and push it immediately. */
+export async function sendCurrentPosition(): Promise<void> {
+  const childId = await getStoredChildId();
+  if (!childId) return;
+  try {
+    const pos = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const level = await Battery.getBatteryLevelAsync();
+    const battery = level >= 0 ? Math.round(level * 100) : null;
+    const { error } = await supabase.rpc("ingest_location", {
+      p_child: childId,
+      p_lng: pos.coords.longitude,
+      p_lat: pos.coords.latitude,
+      p_accuracy: pos.coords.accuracy ?? null,
+      p_battery: battery,
+      p_is_moving: false,
+      p_recorded_at: new Date(pos.timestamp).toISOString(),
+    });
+    if (error) console.warn("sendCurrentPosition ingest failed", error.message);
+  } catch (e: any) {
+    console.warn("sendCurrentPosition failed", e?.message);
+  }
+}
+
 export async function startTracking(): Promise<void> {
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") {
@@ -38,13 +63,17 @@ export async function startTracking(): Promise<void> {
   // Background permission may be limited/deferred on some OS — best effort.
   await Location.requestBackgroundPermissionsAsync();
 
+  // Push one position right away so the parent sees the child immediately
+  // (background updates only fire on movement / interval).
+  await sendCurrentPosition();
+
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK);
   if (already) return;
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK, {
     accuracy: Location.Accuracy.Balanced,
-    timeInterval: 30_000,
-    distanceInterval: 50,
+    timeInterval: 15_000,
+    distanceInterval: 10,
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
