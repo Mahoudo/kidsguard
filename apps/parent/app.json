@@ -8,6 +8,7 @@
     "scheme": "kidsguard",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.kidsguard.parent",
       "icon": "./assets/expo.icon",
       "config": {
         "googleMapsApiKey": "TODO_GOOGLE_MAPS_IOS_API_KEY"
@@ -17,6 +18,7 @@
       }
     },
     "android": {
+      "package": "com.kidsguard.parent",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
