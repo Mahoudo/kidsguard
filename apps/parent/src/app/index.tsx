@@ -226,6 +226,9 @@ function Dashboard() {
         <View style={styles.sheetHeader}>
           <Text style={styles.h2}>Enfants</Text>
           <View style={{ flexDirection: "row", gap: 16 }}>
+            <TouchableOpacity onPress={refresh}>
+              <Text style={styles.link}>↻</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={addZone}>
               <Text style={styles.link}>+ Zone</Text>
             </TouchableOpacity>
