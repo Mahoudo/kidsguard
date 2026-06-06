@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,15 +10,23 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Circle, Marker, type Region } from "react-native-maps";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import {
   createChild,
+  createPlace,
   fetchChildren,
+  fetchGeofenceFeed,
+  fetchPlaces,
+  fetchSos,
+  resolveSos,
   sendCommand,
+  subscribeGeofence,
   subscribeLocations,
+  subscribeSos,
   type ChildWithLocation,
+  type PlaceOverview,
 } from "../../lib/api";
 
 export default function HomeScreen() {
@@ -104,12 +112,16 @@ function Auth() {
 // ---------------------------------------------------------------------------
 function Dashboard() {
   const [children, setChildren] = useState<ChildWithLocation[]>([]);
+  const [places, setPlaces] = useState<PlaceOverview[]>([]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
+  const region = useRef<Region | null>(null);
 
   async function refresh() {
     try {
-      setChildren(await fetchChildren());
+      const [ch, pl] = await Promise.all([fetchChildren(), fetchPlaces()]);
+      setChildren(ch);
+      setPlaces(pl);
     } catch (e: any) {
       console.warn(e.message);
     }
@@ -117,9 +129,59 @@ function Dashboard() {
 
   useEffect(() => {
     refresh();
-    const unsub = subscribeLocations(refresh);
-    return unsub;
+    const unsubLoc = subscribeLocations(refresh);
+    const unsubGeo = subscribeGeofence(async () => {
+      const feed = await fetchGeofenceFeed(1).catch(() => []);
+      const last = feed[0];
+      if (last) {
+        const verb = last.direction === "enter" ? "arrivé(e) à" : "parti(e) de";
+        Alert.alert("Alerte zone", `${last.child_name} est ${verb} ${last.place_name}`);
+      }
+    });
+    const unsubSos = subscribeSos(async () => {
+      const feed = await fetchSos(1).catch(() => []);
+      const last = feed[0];
+      if (last && !last.resolved_at) {
+        Alert.alert(
+          "🆘 SOS",
+          `${last.child_name} a déclenché une alerte SOS !`,
+          [
+            { text: "Plus tard", style: "cancel" },
+            {
+              text: "Marquer résolu",
+              onPress: () => resolveSos(last.id).catch(() => {}),
+            },
+          ]
+        );
+      }
+    });
+    return () => {
+      unsubLoc();
+      unsubGeo();
+      unsubSos();
+    };
   }, []);
+
+  async function addZone() {
+    const center = region.current;
+    if (!center) {
+      Alert.alert("Carte", "Déplace la carte sur la zone à enregistrer.");
+      return;
+    }
+    try {
+      await createPlace({
+        name: "Nouvelle zone",
+        kind: "other",
+        lng: center.longitude,
+        lat: center.latitude,
+        radiusM: 150,
+      });
+      await refresh();
+      Alert.alert("Zone créée", "Rayon 150 m au centre de la carte.");
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
 
   async function handleAdd() {
     if (!name.trim()) return;
@@ -154,7 +216,20 @@ function Dashboard() {
 
   return (
     <View style={{ flex: 1 }}>
-      <MapView style={{ flex: 1 }} initialRegion={initialRegion}>
+      <MapView
+        style={{ flex: 1 }}
+        initialRegion={initialRegion}
+        onRegionChangeComplete={(r) => (region.current = r)}
+      >
+        {places.map((p) => (
+          <Circle
+            key={p.id}
+            center={{ latitude: p.lat, longitude: p.lng }}
+            radius={p.radius_m}
+            strokeColor="rgba(107,78,230,0.8)"
+            fillColor="rgba(107,78,230,0.15)"
+          />
+        ))}
         {located.map((c) => (
           <Marker
             key={c.id}
@@ -168,9 +243,14 @@ function Dashboard() {
       <SafeAreaView edges={["bottom"]} style={styles.sheet}>
         <View style={styles.sheetHeader}>
           <Text style={styles.h2}>Enfants</Text>
-          <TouchableOpacity onPress={() => setAdding((v) => !v)}>
-            <Text style={styles.link}>{adding ? "Annuler" : "+ Ajouter"}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 16 }}>
+            <TouchableOpacity onPress={addZone}>
+              <Text style={styles.link}>+ Zone</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setAdding((v) => !v)}>
+              <Text style={styles.link}>{adding ? "Annuler" : "+ Enfant"}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {adding && (

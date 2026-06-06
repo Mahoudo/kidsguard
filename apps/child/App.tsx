@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,9 +13,13 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { getStoredChildId, pairWithCode, unpair } from "./lib/pairing";
 import { isTracking, startTracking, stopTracking } from "./lib/location";
+import { startCommandListener, stopCommandListener } from "./lib/commands";
+import { raiseSos } from "./lib/sos";
+import { giveConsent, hasConsent } from "./lib/consent";
 
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const [consent, setConsent] = useState(false);
   const [childId, setChildId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [tracking, setTracking] = useState(false);
@@ -22,12 +27,26 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      setConsent(await hasConsent());
       const id = await getStoredChildId();
       setChildId(id);
       if (id) setTracking(await isTracking());
       setLoading(false);
     })();
   }, []);
+
+  // Command listener runs while paired.
+  useEffect(() => {
+    if (childId) {
+      startCommandListener(childId);
+      return () => stopCommandListener();
+    }
+  }, [childId]);
+
+  async function handleConsent() {
+    await giveConsent();
+    setConsent(true);
+  }
 
   async function handlePair() {
     setBusy(true);
@@ -60,8 +79,19 @@ export default function App() {
     }
   }
 
+  async function handleSos() {
+    if (!childId) return;
+    try {
+      await raiseSos(childId);
+      Alert.alert("SOS envoyé", "Tes parents ont été alertés.");
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
   async function handleUnpair() {
     await stopTracking();
+    stopCommandListener();
     await unpair();
     setChildId(null);
     setTracking(false);
@@ -73,6 +103,25 @@ export default function App() {
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#6B4EE6" />
       </View>
+    );
+  }
+
+  if (!consent) {
+    return (
+      <ScrollView contentContainerStyle={styles.center}>
+        <StatusBar style="dark" />
+        <Text style={styles.title}>Avant de commencer</Text>
+        <Text style={styles.consentText}>
+          Cette application partage ta position avec tes parents pour ta
+          sécurité. Tes parents peuvent voir où tu es, recevoir une alerte
+          quand tu arrives ou quittes certains lieux, et faire sonner ton
+          téléphone.{"\n\n"}En continuant, tu acceptes ce partage. Tu peux
+          mettre le partage en pause à tout moment.
+        </Text>
+        <TouchableOpacity style={styles.btn} onPress={handleConsent}>
+          <Text style={styles.btnText}>J'accepte</Text>
+        </TouchableOpacity>
+      </ScrollView>
     );
   }
 
@@ -113,6 +162,11 @@ export default function App() {
           ? "Ta position est partagée avec tes parents."
           : "Le partage de position est en pause."}
       </Text>
+
+      <TouchableOpacity style={styles.sos} onPress={handleSos}>
+        <Text style={styles.sosText}>SOS</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={[styles.btn, busy && styles.btnDisabled]}
         onPress={toggleTracking}
@@ -131,7 +185,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   center: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
@@ -143,6 +197,13 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     textAlign: "center",
     marginBottom: 24,
+  },
+  consentText: {
+    fontSize: 15,
+    color: "#374151",
+    lineHeight: 22,
+    marginBottom: 28,
+    textAlign: "left",
   },
   input: {
     fontSize: 32,
@@ -163,6 +224,20 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  sos: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 28,
+    shadowColor: "#ef4444",
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  sosText: { color: "#fff", fontSize: 32, fontWeight: "900" },
   link: { marginTop: 20 },
   linkText: { color: "#9ca3af", fontSize: 14 },
 });
