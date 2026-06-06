@@ -156,6 +156,9 @@ function Dashboard() {
 
   useEffect(() => {
     refresh();
+    // Auto-detect: poll every 15s so the child appears/updates on its own,
+    // even without realtime or a manual refresh (no SOS needed).
+    const poll = setInterval(refresh, 15_000);
     // Defensive: a realtime hiccup must never crash the dashboard.
     const unsubs: Array<() => void> = [];
     try {
@@ -186,6 +189,7 @@ function Dashboard() {
       console.warn("realtime subscribe failed:", e?.message);
     }
     return () => {
+      clearInterval(poll);
       for (const u of unsubs) {
         try {
           u();

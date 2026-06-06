@@ -72,9 +72,11 @@ export default function AlertsScreen() {
 
   useEffect(() => {
     load();
+    const poll = setInterval(load, 15_000); // auto-detect new alerts
     const u1 = subscribeGeofence(load);
     const u2 = subscribeSos(load);
     return () => {
+      clearInterval(poll);
       u1();
       u2();
     };
