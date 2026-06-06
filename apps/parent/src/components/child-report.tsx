@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   ScrollView,
   StyleSheet,
   Text,
@@ -54,13 +55,23 @@ export function ChildReport({ childId, childName, onClose }: Props) {
 
   const fmt = (iso: string) => new Date(iso).toLocaleString("fr-FR");
 
+  // Android hardware back closes the report (it's an overlay, not a route).
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onClose]);
+
   return (
     <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
       <View style={styles.head}>
-        <Text style={styles.title}>Rapport · {childName}</Text>
-        <TouchableOpacity onPress={onClose} style={styles.close}>
-          <Text style={styles.closeTxt}>✕</Text>
+        <TouchableOpacity onPress={onClose} style={styles.back}>
+          <Text style={styles.backTxt}>‹ Retour</Text>
         </TouchableOpacity>
+        <Text style={styles.title}>{childName}</Text>
+        <View style={{ width: 64 }} />
       </View>
 
       {loading ? (
@@ -166,16 +177,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#eee",
   },
-  title: { fontSize: 20, fontWeight: "800", color: "#1f2440" },
-  close: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#f3f0ff",
-    alignItems: "center",
+  title: { fontSize: 18, fontWeight: "800", color: "#1f2440" },
+  back: {
+    width: 64,
+    paddingVertical: 6,
     justifyContent: "center",
   },
-  closeTxt: { fontSize: 16, color: "#6B4EE6", fontWeight: "700" },
+  backTxt: { fontSize: 16, color: "#6B4EE6", fontWeight: "700" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   stat: {
