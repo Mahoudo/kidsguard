@@ -14,6 +14,7 @@ import {
   fetchChildTrack,
   fetchChildren,
   fetchGeofenceFeed,
+  fetchPlaces,
   fetchSos,
   fetchUsage,
   type ChildWithLocation,
@@ -22,6 +23,7 @@ import {
   type TrackPoint,
   type UsageRow,
 } from "../../lib/api";
+import { computeSecurityScore } from "../../lib/score";
 
 interface Props {
   childId: string;
@@ -38,23 +40,26 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   const [geo, setGeo] = useState<GeofenceEvent[]>([]);
   const [sos, setSos] = useState<SosEvent[]>([]);
   const [usage, setUsage] = useState<UsageRow[]>([]);
+  const [zonesCount, setZonesCount] = useState(0);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [kids, t, g, s, u] = await Promise.all([
+        const [kids, t, g, s, u, pl] = await Promise.all([
           fetchChildren().catch(() => []),
           fetchChildTrack(childId, 50).catch(() => []),
           fetchGeofenceFeed(100).catch(() => []),
           fetchSos(50).catch(() => []),
           fetchUsage(childId).catch(() => []),
+          fetchPlaces().catch(() => []),
         ]);
         setInfo(kids.find((k) => k.id === childId) ?? null);
         setTrack(t);
         setGeo(g.filter((e) => e.child_id === childId));
         setSos(s.filter((e) => e.child_id === childId));
         setUsage(u);
+        setZonesCount(pl.length);
       } finally {
         setLoading(false);
       }
@@ -75,6 +80,16 @@ export function ChildReport({ childId, childName, onClose }: Props) {
     return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}min` : `${m}min`;
   };
   const totalScreen = usage.reduce((a, b) => a + b.total_ms, 0);
+  const score = computeSecurityScore({
+    name: childName,
+    lastSeen: info?.last_seen_at ?? null,
+    battery: info?.last_battery_pct ?? null,
+    screenMs: totalScreen,
+    zonesCount,
+    unresolvedSos: sos.some((x) => !x.resolved_at),
+  });
+  const barColor = (v: number) =>
+    v >= 80 ? "#21C97A" : v >= 60 ? "#FFA726" : "#FF4D6D";
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <View style={st.stat}>
@@ -106,6 +121,33 @@ export function ChildReport({ childId, childName, onClose }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <View style={[st.scoreCard, { borderColor: score.color }]}>
+            <View style={st.scoreTop}>
+              <View style={[st.scoreBadge, { backgroundColor: score.color }]}>
+                <Text style={st.scoreVal}>{score.global}</Text>
+                <Text style={st.scorePct}>%</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={st.scoreTitle}>Score de sécurité IA</Text>
+                <Text style={st.scoreSummary}>{score.summary}</Text>
+              </View>
+            </View>
+            {score.parts.map((p) => (
+              <View key={p.key} style={st.barRow}>
+                <Text style={st.barLabel}>{p.label}</Text>
+                <View style={st.barTrack}>
+                  <View
+                    style={[
+                      st.barFill,
+                      { width: `${p.value}%`, backgroundColor: barColor(p.value) },
+                    ]}
+                  />
+                </View>
+                <Text style={st.barVal}>{p.value}</Text>
+              </View>
+            ))}
+          </View>
+
           <View style={st.statsRow}>
             <Stat label="Batterie" value={info?.last_battery_pct != null ? `${info.last_battery_pct}%` : "—"} />
             <Stat label="Écran" value={dur(totalScreen)} />
@@ -201,6 +243,37 @@ function makeStyles(t: Theme) {
     back: { width: 64, paddingVertical: 6, justifyContent: "center" },
     backTxt: { fontSize: 16, color: t.primary, fontWeight: "700" },
     center: { flex: 1, alignItems: "center", justifyContent: "center" },
+    scoreCard: {
+      backgroundColor: t.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1.5,
+    },
+    scoreTop: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
+    scoreBadge: {
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+    },
+    scoreVal: { color: "#fff", fontSize: 26, fontWeight: "900" },
+    scorePct: { color: "#fff", fontSize: 13, fontWeight: "800", marginTop: 4 },
+    scoreTitle: { fontSize: 15, fontWeight: "800", color: t.text, marginBottom: 4 },
+    scoreSummary: { fontSize: 13, color: t.muted, lineHeight: 19 },
+    barRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 7 },
+    barLabel: { fontSize: 12, color: t.muted, width: 92 },
+    barTrack: {
+      flex: 1,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: t.cardAlt,
+      overflow: "hidden",
+    },
+    barFill: { height: 8, borderRadius: 4 },
+    barVal: { fontSize: 12, fontWeight: "700", color: t.text, width: 26, textAlign: "right" },
     statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
     stat: {
       flex: 1,
