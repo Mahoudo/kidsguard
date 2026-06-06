@@ -31,7 +31,10 @@
           "apiKey": "TODO_GOOGLE_MAPS_ANDROID_API_KEY"
         }
       },
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -53,6 +56,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8769d831-4db3-44b9-bf41-f5700de1fa01"
+      }
+    },
+    "owner": "mahoudo"
   }
 }

@@ -12,7 +12,9 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "KidsGuard partage ta position avec tes parents.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "KidsGuard partage ta position avec tes parents, même en arrière-plan.",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -30,7 +32,12 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "android.permission.PACKAGE_USAGE_STATS"
+        "android.permission.PACKAGE_USAGE_STATS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -46,6 +53,12 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5c6246b3-876f-45d8-b9ce-b101622fb041"
+      }
+    },
+    "owner": "mahoudo"
   }
 }
