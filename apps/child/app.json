@@ -56,7 +56,8 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "extra": {
       "eas": {

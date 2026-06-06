@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import { MapPanel, type MapPanelHandle } from "../components/map-panel";
 import { ChildReport } from "../components/child-report";
+import { registerForPush } from "../../lib/push";
 import { supabase } from "../../lib/supabase";
 import {
   createChild,
@@ -44,6 +45,11 @@ export default function HomeScreen() {
     );
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Register for background push once signed in (no-op on web).
+  useEffect(() => {
+    if (session) registerForPush();
+  }, [session]);
 
   if (!ready) {
     return (
