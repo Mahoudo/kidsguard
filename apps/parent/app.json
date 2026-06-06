@@ -10,9 +10,6 @@
     "ios": {
       "bundleIdentifier": "com.kidsguard.parent",
       "icon": "./assets/expo.icon",
-      "config": {
-        "googleMapsApiKey": "TODO_GOOGLE_MAPS_IOS_API_KEY"
-      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Afficher votre position sur la carte."
       }
@@ -26,11 +23,6 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": "TODO_GOOGLE_MAPS_ANDROID_API_KEY"
-        }
-      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
@@ -51,7 +43,8 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/ui": "~56.0.16",
     "@kidsguard/shared": "workspace:*",
+    "@maplibre/maplibre-react-native": "^11.3.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~56.0.9",
@@ -26,7 +27,6 @@
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.31.1",
-    "react-native-maps": "1.27.2",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",

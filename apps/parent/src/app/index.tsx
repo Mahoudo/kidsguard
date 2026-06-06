@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Circle, Marker, type Region } from "react-native-maps";
+import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import {
@@ -28,6 +28,20 @@ import {
   type ChildWithLocation,
   type PlaceOverview,
 } from "../../lib/api";
+
+// Free OpenStreetMap raster tiles — no API key, no billing.
+const OSM_STYLE: any = {
+  version: 8,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      attribution: "© OpenStreetMap",
+    },
+  },
+  layers: [{ id: "osm", type: "raster", source: "osm" }],
+};
 
 export default function HomeScreen() {
   const [session, setSession] = useState<Session | null>(null);
@@ -123,7 +137,7 @@ function Dashboard() {
   const [places, setPlaces] = useState<PlaceOverview[]>([]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const region = useRef<Region | null>(null);
+  const mapRef = useRef<any>(null);
 
   async function refresh() {
     try {
@@ -176,17 +190,22 @@ function Dashboard() {
   }, []);
 
   async function addZone() {
-    const center = region.current;
-    if (!center) {
-      Alert.alert("Carte", "Déplace la carte sur la zone à enregistrer.");
+    let c: any;
+    try {
+      c = await mapRef.current?.getCenter?.();
+    } catch {}
+    const lng = Array.isArray(c) ? c[0] : (c?.longitude ?? c?.lng);
+    const lat = Array.isArray(c) ? c[1] : (c?.latitude ?? c?.lat);
+    if (lng == null || lat == null) {
+      Alert.alert("Carte", "Carte pas prête — réessaie.");
       return;
     }
     try {
       await createPlace({
         name: "Nouvelle zone",
         kind: "other",
-        lng: center.longitude,
-        lat: center.latitude,
+        lng,
+        lat,
         radiusM: 150,
       });
       await refresh();
@@ -213,45 +232,27 @@ function Dashboard() {
   }
 
   const located = children.filter((c) => c.lat != null && c.lng != null);
-  const initialRegion = located[0]
-    ? {
-        latitude: located[0].lat!,
-        longitude: located[0].lng!,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }
-    : {
-        latitude: 5.345, // Abidjan par défaut
-        longitude: -4.024,
-        latitudeDelta: 0.2,
-        longitudeDelta: 0.2,
-      };
+  const center: [number, number] = located[0]
+    ? [located[0].lng!, located[0].lat!]
+    : [-4.024, 5.345]; // Abidjan par défaut
 
   return (
     <View style={{ flex: 1 }}>
-      <MapView
-        style={{ flex: 1 }}
-        initialRegion={initialRegion}
-        onRegionChangeComplete={(r) => (region.current = r)}
-      >
+      <Map ref={mapRef} style={{ flex: 1 }} mapStyle={OSM_STYLE}>
+        <Camera center={center} zoom={12} />
         {places.map((p) => (
-          <Circle
-            key={p.id}
-            center={{ latitude: p.lat, longitude: p.lng }}
-            radius={p.radius_m}
-            strokeColor="rgba(107,78,230,0.8)"
-            fillColor="rgba(107,78,230,0.15)"
-          />
+          <Marker key={p.id} id={`zone-${p.id}`} lngLat={[p.lng, p.lat]}>
+            <View style={styles.zoneDot} />
+          </Marker>
         ))}
         {located.map((c) => (
-          <Marker
-            key={c.id}
-            coordinate={{ latitude: c.lat!, longitude: c.lng! }}
-            title={c.name}
-            description={c.located_at ?? undefined}
-          />
+          <Marker key={c.id} id={`kid-${c.id}`} lngLat={[c.lng!, c.lat!]}>
+            <View style={styles.pin}>
+              <Text style={styles.pinTxt}>🧒</Text>
+            </View>
+          </Marker>
         ))}
-      </MapView>
+      </Map>
 
       <SafeAreaView edges={["bottom"]} style={styles.sheet}>
         <View style={styles.sheetHeader}>
@@ -401,4 +402,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   ringText: { fontSize: 18 },
+  pin: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#6B4EE6",
+    borderWidth: 3,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinTxt: { fontSize: 18 },
+  zoneDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(107,78,230,0.25)",
+    borderWidth: 2,
+    borderColor: "#6B4EE6",
+  },
 });
