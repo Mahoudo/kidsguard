@@ -15,6 +15,7 @@ import { MapPanel, type MapPanelHandle } from "../components/map-panel";
 import { ChildReport } from "../components/child-report";
 import { registerForPush } from "../../lib/push";
 import { supabase } from "../../lib/supabase";
+import { useTheme, type Theme } from "../theme";
 import {
   createChild,
   createPlace,
@@ -32,6 +33,7 @@ import {
 } from "../../lib/api";
 
 export default function HomeScreen() {
+  const t = useTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -46,15 +48,14 @@ export default function HomeScreen() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Register for background push once signed in (no-op on web).
   useEffect(() => {
     if (session) registerForPush();
   }, [session]);
 
   if (!ready) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6B4EE6" />
+      <View style={[styles0.fill, { backgroundColor: t.bg }]}>
+        <ActivityIndicator size="large" color={t.primary} />
       </View>
     );
   }
@@ -63,6 +64,8 @@ export default function HomeScreen() {
 
 // ---------------------------------------------------------------------------
 function Auth() {
+  const t = useTheme();
+  const s = makeStyles(t);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +79,6 @@ function Auth() {
       } else {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        // If email confirmation is ON, signUp returns no session.
         if (!data.session) {
           Alert.alert(
             "Compte créé",
@@ -92,40 +94,50 @@ function Auth() {
   }
 
   return (
-    <SafeAreaView style={styles.center}>
-      <Text style={styles.h1}>KidsGuard</Text>
-      <Text style={styles.muted}>Espace parent</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Mot de passe"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-      <TouchableOpacity
-        style={[styles.btn, busy && styles.dim]}
-        disabled={busy}
-        onPress={() => submit("in")}
-      >
-        <Text style={styles.btnText}>Se connecter</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => submit("up")} style={{ marginTop: 14 }}>
-        <Text style={styles.link}>Créer un compte</Text>
-      </TouchableOpacity>
+    <SafeAreaView style={[s.authWrap, { backgroundColor: t.bg }]}>
+      <View style={s.logo}>
+        <Text style={{ fontSize: 38 }}>🛡️</Text>
+      </View>
+      <Text style={s.brand}>KidsGuard</Text>
+      <Text style={s.brandSub}>Protégez ce qui compte le plus</Text>
+
+      <View style={s.authCard}>
+        <TextInput
+          style={s.input}
+          placeholder="Email"
+          placeholderTextColor={t.muted}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <TextInput
+          style={s.input}
+          placeholder="Mot de passe"
+          placeholderTextColor={t.muted}
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+        <TouchableOpacity
+          style={[s.btn, busy && s.dim]}
+          disabled={busy}
+          onPress={() => submit("in")}
+        >
+          <Text style={s.btnText}>{busy ? "…" : "Se connecter"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => submit("up")} style={{ marginTop: 16 }}>
+          <Text style={s.link}>Créer un compte</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 // ---------------------------------------------------------------------------
 function Dashboard() {
+  const t = useTheme();
+  const s = makeStyles(t);
   const [children, setChildren] = useState<ChildWithLocation[]>([]);
   const [places, setPlaces] = useState<PlaceOverview[]>([]);
   const [adding, setAdding] = useState(false);
@@ -162,10 +174,7 @@ function Dashboard() {
 
   useEffect(() => {
     refresh();
-    // Auto-detect: poll every 15s so the child appears/updates on its own,
-    // even without realtime or a manual refresh (no SOS needed).
     const poll = setInterval(refresh, 15_000);
-    // Defensive: a realtime hiccup must never crash the dashboard.
     const unsubs: Array<() => void> = [];
     try {
       unsubs.push(subscribeLocations(refresh));
@@ -212,13 +221,7 @@ function Dashboard() {
     }
     const [lng, lat] = c;
     try {
-      await createPlace({
-        name: "Nouvelle zone",
-        kind: "other",
-        lng,
-        lat,
-        radiusM: 150,
-      });
+      await createPlace({ name: "Nouvelle zone", kind: "other", lng, lat, radiusM: 150 });
       await refresh();
       Alert.alert("Zone créée", "Rayon 150 m au centre de la carte.");
     } catch (e: any) {
@@ -245,38 +248,39 @@ function Dashboard() {
   const located = children.filter((c) => c.lat != null && c.lng != null);
   const center: [number, number] = located[0]
     ? [located[0].lng!, located[0].lat!]
-    : [-4.024, 5.345]; // Abidjan par défaut
+    : [-4.024, 5.345];
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
       <MapPanel ref={mapRef} located={located} places={places} center={center} />
 
-      <SafeAreaView edges={["bottom"]} style={styles.sheet}>
-        <View style={styles.sheetHeader}>
-          <Text style={styles.h2}>Enfants</Text>
-          <View style={{ flexDirection: "row", gap: 16 }}>
-            <TouchableOpacity onPress={refresh}>
-              <Text style={styles.link}>↻</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={addZone}>
-              <Text style={styles.link}>+ Zone</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setAdding((v) => !v)}>
-              <Text style={styles.link}>{adding ? "Annuler" : "+ Enfant"}</Text>
-            </TouchableOpacity>
+      <SafeAreaView edges={["bottom"]} style={s.sheet}>
+        <View style={s.grabber} />
+        <View style={s.sheetHeader}>
+          <Text style={s.h2}>Ma famille</Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pill t={t} label="↻" onPress={refresh} />
+            <Pill t={t} label="+ Zone" onPress={addZone} />
+            <Pill
+              t={t}
+              label={adding ? "Annuler" : "+ Enfant"}
+              onPress={() => setAdding((v) => !v)}
+              primary
+            />
           </View>
         </View>
 
         {adding && (
-          <View style={styles.addRow}>
+          <View style={s.addRow}>
             <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              placeholder="Prénom"
+              style={[s.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="Prénom de l'enfant"
+              placeholderTextColor={t.muted}
               value={name}
               onChangeText={setName}
             />
-            <TouchableOpacity style={styles.btnSm} onPress={handleAdd}>
-              <Text style={styles.btnText}>OK</Text>
+            <TouchableOpacity style={s.btnSm} onPress={handleAdd}>
+              <Text style={s.btnText}>OK</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -284,52 +288,69 @@ function Dashboard() {
         <FlatList
           data={children}
           keyExtractor={(c) => c.id}
-          style={{ maxHeight: 240 }}
+          style={{ maxHeight: 280 }}
           ListEmptyComponent={
-            <Text style={styles.muted}>Aucun enfant. Ajoute-en un.</Text>
+            <Text style={[s.muted, { paddingVertical: 14 }]}>
+              Aucun enfant. Ajoute-en un pour commencer.
+            </Text>
           }
-          renderItem={({ item }) => (
-            <View style={styles.childRow}>
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                onPress={() => onChildPress(item)}
-                activeOpacity={0.6}
-              >
-                <Text style={styles.childName}>{item.name}</Text>
-                <Text style={styles.muted}>
-                  {item.pairing_code
-                    ? `Code : ${item.pairing_code}`
-                    : item.located_at
-                      ? `Vu ${new Date(item.located_at).toLocaleTimeString("fr-FR")} · tap = carte, double = rapport`
-                      : "Jamais localisé"}
-                  {item.last_battery_pct != null
-                    ? ` · ${item.last_battery_pct}%`
-                    : ""}
-                </Text>
-              </TouchableOpacity>
-              {!item.pairing_code && (
+          renderItem={({ item }) => {
+            const online =
+              !!item.last_seen_at &&
+              Date.now() - new Date(item.last_seen_at).getTime() < 120_000;
+            const initial = item.name.trim().charAt(0).toUpperCase() || "?";
+            const batt = item.last_battery_pct;
+            const battColor =
+              batt == null ? t.muted : batt > 50 ? t.success : batt > 20 ? t.warning : t.danger;
+            return (
+              <View style={s.childCard}>
                 <TouchableOpacity
-                  style={styles.ring}
-                  onPress={() =>
-                    sendCommand(item.id, "ring").catch((e) =>
-                      Alert.alert("Erreur", e.message)
-                    )
-                  }
+                  style={s.childMain}
+                  onPress={() => onChildPress(item)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.ringText}>🔔</Text>
+                  <View style={s.avatar}>
+                    <Text style={s.avatarTxt}>{initial}</Text>
+                    <View
+                      style={[
+                        s.statusDot,
+                        { backgroundColor: online ? t.success : t.muted },
+                      ]}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.childName}>{item.name}</Text>
+                    <Text style={s.childSub}>
+                      {item.pairing_code
+                        ? `Code : ${item.pairing_code}`
+                        : item.located_at
+                          ? `${online ? "En ligne" : "Vu"} ${new Date(item.located_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                          : "Jamais localisé"}
+                    </Text>
+                  </View>
+                  {batt != null && (
+                    <View style={[s.battPill, { borderColor: battColor }]}>
+                      <Text style={[s.battTxt, { color: battColor }]}>{batt}%</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
-              )}
-            </View>
-          )}
+                {!item.pairing_code && (
+                  <TouchableOpacity
+                    style={s.ring}
+                    onPress={() =>
+                      sendCommand(item.id, "ring").catch((e) => Alert.alert("Erreur", e.message))
+                    }
+                  >
+                    <Text style={s.ringText}>🔔</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          }}
         />
 
-        <TouchableOpacity
-          onPress={() => supabase.auth.signOut()}
-          style={{ marginTop: 8 }}
-        >
-          <Text style={[styles.muted, { textAlign: "center" }]}>
-            Déconnexion
-          </Text>
+        <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 10 }}>
+          <Text style={[s.muted, { textAlign: "center" }]}>Déconnexion</Text>
         </TouchableOpacity>
       </SafeAreaView>
 
@@ -344,93 +365,173 @@ function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  h1: { fontSize: 32, fontWeight: "800", color: "#1f2440" },
-  h2: { fontSize: 18, fontWeight: "700", color: "#1f2440" },
-  muted: { color: "#6b7280", fontSize: 13 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-    minWidth: 260,
-    fontSize: 16,
-  },
-  btn: {
-    backgroundColor: "#6B4EE6",
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    borderRadius: 999,
-    marginTop: 8,
-  },
-  btnSm: {
-    backgroundColor: "#6B4EE6",
-    paddingHorizontal: 18,
-    justifyContent: "center",
-    borderRadius: 10,
-  },
-  dim: { opacity: 0.5 },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  link: { color: "#6B4EE6", fontWeight: "600" },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  addRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
-  childRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
-  },
-  childName: { fontSize: 16, fontWeight: "600", color: "#1f2440" },
-  ring: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f3f0ff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ringText: { fontSize: 18 },
-  pin: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#6B4EE6",
-    borderWidth: 3,
-    borderColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pinTxt: { fontSize: 18 },
-  zoneDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(107,78,230,0.25)",
-    borderWidth: 2,
-    borderColor: "#6B4EE6",
-  },
+function Pill({
+  t,
+  label,
+  onPress,
+  primary,
+}: {
+  t: Theme;
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: primary ? t.primary : t.cardAlt,
+      }}
+    >
+      <Text
+        style={{
+          color: primary ? t.onPrimary : t.text,
+          fontWeight: "700",
+          fontSize: 13,
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles0 = StyleSheet.create({
+  fill: { flex: 1, alignItems: "center", justifyContent: "center" },
 });
+
+function makeStyles(t: Theme) {
+  return StyleSheet.create({
+    authWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
+    logo: {
+      width: 84,
+      height: 84,
+      borderRadius: 24,
+      backgroundColor: t.primarySoft,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 14,
+    },
+    brand: { fontSize: 30, fontWeight: "900", color: t.text, letterSpacing: -0.5 },
+    brandSub: { fontSize: 14, color: t.muted, marginTop: 4, marginBottom: 26 },
+    authCard: {
+      width: "100%",
+      maxWidth: 380,
+      backgroundColor: t.card,
+      borderRadius: 22,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    input: {
+      backgroundColor: t.cardAlt,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      marginBottom: 12,
+      fontSize: 16,
+      color: t.text,
+    },
+    btn: {
+      backgroundColor: t.primary,
+      paddingVertical: 15,
+      borderRadius: 14,
+      alignItems: "center",
+      marginTop: 6,
+      shadowColor: t.primary,
+      shadowOpacity: 0.4,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    btnSm: {
+      backgroundColor: t.primary,
+      paddingHorizontal: 20,
+      justifyContent: "center",
+      borderRadius: 12,
+    },
+    dim: { opacity: 0.5 },
+    btnText: { color: t.onPrimary, fontWeight: "800", fontSize: 15 },
+    link: { color: t.primary, fontWeight: "700", textAlign: "center" },
+    muted: { color: t.muted, fontSize: 13 },
+    h2: { fontSize: 19, fontWeight: "800", color: t.text },
+    sheet: {
+      backgroundColor: t.card,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 6,
+      shadowColor: "#000",
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: -4 },
+      elevation: 16,
+    },
+    grabber: {
+      width: 44,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: t.border,
+      alignSelf: "center",
+      marginBottom: 12,
+    },
+    sheetHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    addRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+    childCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: t.cardAlt,
+      borderRadius: 16,
+      padding: 10,
+      marginBottom: 8,
+    },
+    childMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+    avatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: t.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarTxt: { color: "#fff", fontWeight: "800", fontSize: 18 },
+    statusDot: {
+      position: "absolute",
+      right: -1,
+      bottom: -1,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      borderWidth: 2.5,
+      borderColor: t.cardAlt,
+    },
+    childName: { fontSize: 16, fontWeight: "700", color: t.text },
+    childSub: { fontSize: 13, color: t.muted, marginTop: 2 },
+    battPill: {
+      borderWidth: 1.5,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+    },
+    battTxt: { fontSize: 12, fontWeight: "800" },
+    ring: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: t.primarySoft,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 8,
+    },
+    ringText: { fontSize: 18 },
+  });
+}
