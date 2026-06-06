@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
 import type { ChildWithLocation, PlaceOverview } from "../../lib/api";
@@ -19,6 +19,7 @@ const OSM_STYLE: any = {
 
 export interface MapPanelHandle {
   getCenter(): Promise<[number, number] | null>;
+  centerOn(center: [number, number], zoom?: number): void;
 }
 
 interface Props {
@@ -32,6 +33,10 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
   ref
 ) {
   const mapRef = useRef<any>(null);
+  const [cam, setCam] = useState<{ center: [number, number]; zoom: number }>({
+    center,
+    zoom: 12,
+  });
   useImperativeHandle(ref, () => ({
     async getCenter() {
       try {
@@ -41,11 +46,14 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
       } catch {}
       return null;
     },
+    centerOn(c, zoom = 15) {
+      setCam({ center: c, zoom });
+    },
   }));
 
   return (
     <Map ref={mapRef} style={{ flex: 1 }} mapStyle={OSM_STYLE}>
-      <Camera center={center} zoom={12} />
+      <Camera center={cam.center} zoom={cam.zoom} />
       {places.map((p) => (
         <Marker key={p.id} id={`zone-${p.id}`} lngLat={[p.lng, p.lat]}>
           <View style={styles.zoneDot} />

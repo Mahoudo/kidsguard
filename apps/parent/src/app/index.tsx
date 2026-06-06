@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import { MapPanel, type MapPanelHandle } from "../components/map-panel";
+import { ChildReport } from "../components/child-report";
 import { supabase } from "../../lib/supabase";
 import {
   createChild,
@@ -124,6 +125,24 @@ function Dashboard() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const mapRef = useRef<MapPanelHandle>(null);
+  const lastTap = useRef<{ id: string; t: number }>({ id: "", t: 0 });
+  const [reportChild, setReportChild] = useState<ChildWithLocation | null>(null);
+
+  function onChildPress(item: ChildWithLocation) {
+    const now = Date.now();
+    const isDouble = lastTap.current.id === item.id && now - lastTap.current.t < 320;
+    if (isDouble) {
+      lastTap.current = { id: "", t: 0 };
+      setReportChild(item);
+      return;
+    }
+    lastTap.current = { id: item.id, t: now };
+    if (item.lat != null && item.lng != null) {
+      mapRef.current?.centerOn([item.lng, item.lat], 16);
+    } else {
+      Alert.alert(item.name, "Pas encore de position.");
+    }
+  }
 
   async function refresh() {
     try {
@@ -261,19 +280,23 @@ function Dashboard() {
           }
           renderItem={({ item }) => (
             <View style={styles.childRow}>
-              <View style={{ flex: 1 }}>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => onChildPress(item)}
+                activeOpacity={0.6}
+              >
                 <Text style={styles.childName}>{item.name}</Text>
                 <Text style={styles.muted}>
                   {item.pairing_code
                     ? `Code : ${item.pairing_code}`
                     : item.located_at
-                      ? `Vu ${new Date(item.located_at).toLocaleTimeString("fr-FR")}`
+                      ? `Vu ${new Date(item.located_at).toLocaleTimeString("fr-FR")} · tap = carte, double = rapport`
                       : "Jamais localisé"}
                   {item.last_battery_pct != null
                     ? ` · ${item.last_battery_pct}%`
                     : ""}
                 </Text>
-              </View>
+              </TouchableOpacity>
               {!item.pairing_code && (
                 <TouchableOpacity
                   style={styles.ring}
@@ -299,6 +322,14 @@ function Dashboard() {
           </Text>
         </TouchableOpacity>
       </SafeAreaView>
+
+      {reportChild && (
+        <ChildReport
+          childId={reportChild.id}
+          childName={reportChild.name}
+          onClose={() => setReportChild(null)}
+        />
+      )}
     </View>
   );
 }

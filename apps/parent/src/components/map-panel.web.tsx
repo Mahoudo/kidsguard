@@ -18,6 +18,7 @@ const OSM_STYLE: any = {
 
 export interface MapPanelHandle {
   getCenter(): Promise<[number, number] | null>;
+  centerOn(center: [number, number], zoom?: number): void;
 }
 
 interface Props {
@@ -77,6 +78,9 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
     async getCenter() {
       const c = map.current?.getCenter();
       return c ? [c.lng, c.lat] : null;
+    },
+    centerOn(center, zoom = 15) {
+      map.current?.flyTo({ center, zoom });
     },
   }));
 

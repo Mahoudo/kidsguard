@@ -87,6 +87,26 @@ export async function sendCommand(
   if (error) throw error;
 }
 
+export interface TrackPoint {
+  lng: number;
+  lat: number;
+  accuracy_m: number | null;
+  recorded_at: string;
+}
+
+/** Location history for one child (newest first). */
+export async function fetchChildTrack(
+  childId: string,
+  limit = 50
+): Promise<TrackPoint[]> {
+  const { data, error } = await supabase.rpc("child_track", {
+    p_child: childId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as TrackPoint[];
+}
+
 // ---- Geofencing -----------------------------------------------------------
 
 export interface PlaceOverview {
