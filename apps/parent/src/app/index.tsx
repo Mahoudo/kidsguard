@@ -63,12 +63,20 @@ function Auth() {
   async function submit(mode: "in" | "up") {
     setBusy(true);
     try {
-      const fn =
-        mode === "in"
-          ? supabase.auth.signInWithPassword({ email, password })
-          : supabase.auth.signUp({ email, password });
-      const { error } = await fn;
-      if (error) throw error;
+      if (mode === "in") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        // If email confirmation is ON, signUp returns no session.
+        if (!data.session) {
+          Alert.alert(
+            "Compte créé",
+            "Confirme ton email puis connecte-toi. (Ou désactive la confirmation email dans Supabase pour les tests.)"
+          );
+        }
+      }
     } catch (e: any) {
       Alert.alert("Erreur", e.message ?? String(e));
     } finally {
@@ -129,36 +137,41 @@ function Dashboard() {
 
   useEffect(() => {
     refresh();
-    const unsubLoc = subscribeLocations(refresh);
-    const unsubGeo = subscribeGeofence(async () => {
-      const feed = await fetchGeofenceFeed(1).catch(() => []);
-      const last = feed[0];
-      if (last) {
-        const verb = last.direction === "enter" ? "arrivé(e) à" : "parti(e) de";
-        Alert.alert("Alerte zone", `${last.child_name} est ${verb} ${last.place_name}`);
-      }
-    });
-    const unsubSos = subscribeSos(async () => {
-      const feed = await fetchSos(1).catch(() => []);
-      const last = feed[0];
-      if (last && !last.resolved_at) {
-        Alert.alert(
-          "🆘 SOS",
-          `${last.child_name} a déclenché une alerte SOS !`,
-          [
-            { text: "Plus tard", style: "cancel" },
-            {
-              text: "Marquer résolu",
-              onPress: () => resolveSos(last.id).catch(() => {}),
-            },
-          ]
-        );
-      }
-    });
+    // Defensive: a realtime hiccup must never crash the dashboard.
+    const unsubs: Array<() => void> = [];
+    try {
+      unsubs.push(subscribeLocations(refresh));
+      unsubs.push(
+        subscribeGeofence(async () => {
+          const feed = await fetchGeofenceFeed(1).catch(() => []);
+          const last = feed[0];
+          if (last) {
+            const verb = last.direction === "enter" ? "arrivé(e) à" : "parti(e) de";
+            Alert.alert("Alerte zone", `${last.child_name} est ${verb} ${last.place_name}`);
+          }
+        })
+      );
+      unsubs.push(
+        subscribeSos(async () => {
+          const feed = await fetchSos(1).catch(() => []);
+          const last = feed[0];
+          if (last && !last.resolved_at) {
+            Alert.alert("🆘 SOS", `${last.child_name} a déclenché une alerte SOS !`, [
+              { text: "Plus tard", style: "cancel" },
+              { text: "Marquer résolu", onPress: () => resolveSos(last.id).catch(() => {}) },
+            ]);
+          }
+        })
+      );
+    } catch (e: any) {
+      console.warn("realtime subscribe failed:", e?.message);
+    }
     return () => {
-      unsubLoc();
-      unsubGeo();
-      unsubSos();
+      for (const u of unsubs) {
+        try {
+          u();
+        } catch {}
+      }
     };
   }, []);
 

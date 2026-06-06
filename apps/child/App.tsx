@@ -16,8 +16,41 @@ import { isTracking, startTracking, stopTracking } from "./lib/location";
 import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos } from "./lib/sos";
 import { giveConsent, hasConsent } from "./lib/consent";
+import { Component, type ReactNode } from "react";
+
+// App-wide error boundary: any render/effect crash shows a message, not a close.
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.title}>Oups, une erreur</Text>
+          <Text style={[styles.subtitle, { color: "#b91c1c" }]}>
+            {this.state.error.message}
+          </Text>
+          <TouchableOpacity style={styles.btn} onPress={() => this.setState({ error: null })}>
+            <Text style={styles.btnText}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
+  );
+}
+
+function AppInner() {
   const [loading, setLoading] = useState(true);
   const [consent, setConsent] = useState(false);
   const [childId, setChildId] = useState<string | null>(null);
