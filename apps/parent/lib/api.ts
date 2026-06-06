@@ -87,6 +87,16 @@ export interface ChildWithLocation {
   lat: number | null;
   accuracy_m: number | null;
   located_at: string | null;
+  locked?: boolean;
+}
+
+/** Parent: lock or unlock a child device remotely. */
+export async function setChildLock(childId: string, locked: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_child_lock", {
+    p_child: childId,
+    p_locked: locked,
+  });
+  if (error) throw error;
 }
 
 /** Children + their latest known location (lng/lat decoded server-side). */

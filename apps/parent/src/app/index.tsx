@@ -22,6 +22,7 @@ import {
   createPlace,
   getEmergencyPhone,
   redeemGuardianInvite,
+  setChildLock,
   setEmergencyPhone,
   fetchChildren,
   fetchGeofenceFeed,
@@ -399,14 +400,29 @@ function Dashboard() {
                   )}
                 </TouchableOpacity>
                 {!item.pairing_code && (
-                  <TouchableOpacity
-                    style={s.ring}
-                    onPress={() =>
-                      sendCommand(item.id, "ring").catch((e) => Alert.alert("Erreur", e.message))
-                    }
-                  >
-                    <Text style={s.ringText}>🔔</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      style={s.ring}
+                      onPress={async () => {
+                        try {
+                          await setChildLock(item.id, !item.locked);
+                          await refresh();
+                        } catch (e: any) {
+                          Alert.alert("Erreur", e.message);
+                        }
+                      }}
+                    >
+                      <Text style={s.ringText}>{item.locked ? "🔒" : "🔓"}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.ring}
+                      onPress={() =>
+                        sendCommand(item.id, "ring").catch((e) => Alert.alert("Erreur", e.message))
+                      }
+                    >
+                      <Text style={s.ringText}>🔔</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
               </View>
             );

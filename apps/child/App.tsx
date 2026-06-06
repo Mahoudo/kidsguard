@@ -22,6 +22,7 @@ import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos, sendSosSms } from "./lib/sos";
 import { sendCheckin, type Mood } from "./lib/checkin";
 import { cacheEmergencyPhone } from "./lib/emergency";
+import { getLockState, subscribeLock } from "./lib/lock";
 import { giveConsent, hasConsent } from "./lib/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "./lib/usage";
 
@@ -107,6 +108,7 @@ function AppInner() {
   const [tracking, setTracking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [usageOk, setUsageOk] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -123,10 +125,14 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
-    if (childId) {
-      startCommandListener(childId);
-      return () => stopCommandListener();
-    }
+    if (!childId) return;
+    startCommandListener(childId);
+    getLockState().then(setLocked);
+    const unsubLock = subscribeLock(childId, setLocked);
+    return () => {
+      stopCommandListener();
+      unsubLock();
+    };
   }, [childId]);
 
   useEffect(() => {
@@ -280,6 +286,24 @@ function AppInner() {
           disabled={busy || code.length !== 6}
         />
       </ScrollView>
+    );
+  }
+
+  // ----- Locked by parent -----
+  if (locked) {
+    return (
+      <View style={s.screen}>
+        <StatusBar style="dark" />
+        <Mascot face="🔒" />
+        <Text style={s.h1}>Téléphone en pause</Text>
+        <Text style={s.sub}>
+          Tes parents ont mis ton téléphone en pause. Ça reviendra bientôt 💚
+        </Text>
+        <TouchableOpacity style={s.sos} onPress={handleSos} activeOpacity={0.85}>
+          <Text style={s.sosTxt}>SOS</Text>
+          <Text style={s.sosSub}>en cas de danger</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
