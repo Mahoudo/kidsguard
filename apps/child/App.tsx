@@ -1,5 +1,5 @@
 import "react-native-url-polyfill/auto";
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -22,9 +22,19 @@ import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos } from "./lib/sos";
 import { giveConsent, hasConsent } from "./lib/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "./lib/usage";
-import { Component, type ReactNode } from "react";
 
-// App-wide error boundary: any render/effect crash shows a message, not a close.
+const C = {
+  bg: "#FFF6EC",
+  ink: "#2A2342",
+  muted: "#8A85A0",
+  violet: "#6C5CE7",
+  sun: "#FFB02E",
+  mascot: "#FFE08A",
+  green: "#2BD67B",
+  sos: "#FF5A5F",
+  card: "#FFFFFF",
+};
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) {
@@ -33,14 +43,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   render() {
     if (this.state.error) {
       return (
-        <View style={styles.center}>
-          <Text style={styles.title}>Oups, une erreur</Text>
-          <Text style={[styles.subtitle, { color: "#b91c1c" }]}>
-            {this.state.error.message}
-          </Text>
-          <TouchableOpacity style={styles.btn} onPress={() => this.setState({ error: null })}>
-            <Text style={styles.btnText}>Réessayer</Text>
-          </TouchableOpacity>
+        <View style={s.screen}>
+          <Mascot face="😟" />
+          <Text style={s.h1}>Oups…</Text>
+          <Text style={s.sub}>{this.state.error.message}</Text>
+          <BigButton label="Réessayer" color={C.violet} onPress={() => this.setState({ error: null })} />
         </View>
       );
     }
@@ -53,6 +60,40 @@ export default function App() {
     <ErrorBoundary>
       <AppInner />
     </ErrorBoundary>
+  );
+}
+
+function Mascot({ face = "🦁" }: { face?: string }) {
+  return (
+    <View style={s.mascotWrap}>
+      <View style={s.mascotRing}>
+        <Text style={{ fontSize: 74 }}>{face}</Text>
+      </View>
+      <Text style={s.mascotName}>Léo veille sur toi</Text>
+    </View>
+  );
+}
+
+function BigButton({
+  label,
+  color,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  color: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[s.bigBtn, { backgroundColor: color }, disabled && { opacity: 0.5 }]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+    >
+      <Text style={s.bigBtnTxt}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -72,13 +113,12 @@ function AppInner() {
       setChildId(id);
       if (id) {
         setTracking(await isTracking());
-        sendCurrentPosition(); // push a fresh position on app open
+        sendCurrentPosition();
       }
       setLoading(false);
     })();
   }, []);
 
-  // Command listener runs while paired.
   useEffect(() => {
     if (childId) {
       startCommandListener(childId);
@@ -86,7 +126,6 @@ function AppInner() {
     }
   }, [childId]);
 
-  // Screen-time: report per-app usage to the parent (Android, needs access).
   useEffect(() => {
     if (!childId) return;
     let ok = false;
@@ -127,7 +166,7 @@ function AppInner() {
       await startTracking();
       setTracking(true);
     } catch (e: any) {
-      Alert.alert("Échec", e.message ?? String(e));
+      Alert.alert("Oups", e.message ?? String(e));
     } finally {
       setBusy(false);
     }
@@ -154,7 +193,7 @@ function AppInner() {
     if (!childId) return;
     try {
       await raiseSos(childId);
-      Alert.alert("SOS envoyé", "Tes parents ont été alertés.");
+      Alert.alert("SOS envoyé ✅", "Tes parents sont prévenus, ne bouge pas.");
     } catch (e: any) {
       Alert.alert("Erreur", e.message ?? String(e));
     }
@@ -171,165 +210,200 @@ function AppInner() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6B4EE6" />
+      <View style={s.screen}>
+        <ActivityIndicator size="large" color={C.violet} />
       </View>
     );
   }
 
+  // ----- Consent -----
   if (!consent) {
     return (
-      <ScrollView contentContainerStyle={styles.center}>
+      <ScrollView contentContainerStyle={s.screen}>
         <StatusBar style="dark" />
-        <Text style={styles.title}>Avant de commencer</Text>
-        <Text style={styles.consentText}>
-          Cette application partage ta position avec tes parents pour ta
-          sécurité. Tes parents peuvent voir où tu es, recevoir une alerte
-          quand tu arrives ou quittes certains lieux, et faire sonner ton
-          téléphone.{"\n\n"}En continuant, tu acceptes ce partage. Tu peux
-          mettre le partage en pause à tout moment.
-        </Text>
-        <TouchableOpacity style={styles.btn} onPress={handleConsent}>
-          <Text style={styles.btnText}>J'accepte</Text>
-        </TouchableOpacity>
+        <Mascot face="🦁" />
+        <Text style={s.h1}>Salut, moi c'est Léo&nbsp;!</Text>
+        <View style={s.card}>
+          <Text style={s.cardText}>
+            Cette appli aide tes parents à savoir que tu es{" "}
+            <Text style={{ fontWeight: "800" }}>en sécurité</Text>.{"\n\n"}
+            • Ils voient où tu es 📍{"\n"}
+            • Tu as un bouton <Text style={{ fontWeight: "800" }}>SOS</Text> si tu as un souci 🆘{"\n"}
+            • Tu peux mettre en pause quand tu veux ⏸️
+          </Text>
+        </View>
+        <BigButton label="OK, j'ai compris !" color={C.green} onPress={handleConsent} />
       </ScrollView>
     );
   }
 
+  // ----- Pairing -----
   if (!childId) {
     return (
-      <View style={styles.center}>
+      <ScrollView contentContainerStyle={s.screen}>
         <StatusBar style="dark" />
-        <Text style={styles.title}>Associer cet appareil</Text>
-        <Text style={styles.subtitle}>
-          Saisis le code à 6 chiffres affiché sur le téléphone du parent.
-        </Text>
+        <Mascot face="🦁" />
+        <Text style={s.h1}>On se connecte&nbsp;?</Text>
+        <Text style={s.sub}>Tape le code à 6 chiffres de tes parents 👇</Text>
         <TextInput
-          style={styles.input}
+          style={s.code}
           value={code}
           onChangeText={setCode}
           keyboardType="number-pad"
           maxLength={6}
-          placeholder="000000"
+          placeholder="• • • • • •"
+          placeholderTextColor="#CFC8E0"
           textAlign="center"
         />
-        <TouchableOpacity
-          style={[styles.btn, busy && styles.btnDisabled]}
+        <BigButton
+          label={busy ? "…" : "Connecter"}
+          color={C.violet}
           onPress={handlePair}
           disabled={busy || code.length !== 6}
-        >
-          <Text style={styles.btnText}>{busy ? "..." : "Associer"}</Text>
-        </TouchableOpacity>
-      </View>
+        />
+      </ScrollView>
     );
   }
 
+  // ----- Active -----
   return (
-    <View style={styles.center}>
+    <ScrollView contentContainerStyle={s.screen}>
       <StatusBar style="dark" />
-      <Text style={styles.title}>{tracking ? "🟢 Actif" : "⚪ En pause"}</Text>
-      <Text style={styles.subtitle}>
+      <Mascot face={tracking ? "🦁" : "😴"} />
+      <Text style={s.h1}>{tracking ? "Tout va bien !" : "En pause"}</Text>
+      <Text style={s.sub}>
         {tracking
-          ? "Ta position est partagée avec tes parents."
-          : "Le partage de position est en pause."}
+          ? "Tes parents savent que tu es en sécurité 💚"
+          : "Le partage est en pause ⏸️"}
       </Text>
 
-      <TouchableOpacity style={styles.sos} onPress={handleSos}>
-        <Text style={styles.sosText}>SOS</Text>
+      <TouchableOpacity style={s.sos} onPress={handleSos} activeOpacity={0.85}>
+        <Text style={s.sosTxt}>SOS</Text>
+        <Text style={s.sosSub}>en cas de danger</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.btn, busy && styles.btnDisabled]}
-        onPress={toggleTracking}
-        disabled={busy}
-      >
-        <Text style={styles.btnText}>
-          {tracking ? "Mettre en pause" : "Reprendre"}
+      <TouchableOpacity style={s.pausePill} onPress={toggleTracking} disabled={busy}>
+        <Text style={s.pausePillTxt}>
+          {tracking ? "⏸️  Mettre en pause" : "▶️  Reprendre"}
         </Text>
       </TouchableOpacity>
-      <View style={styles.usageBox}>
-        <Text style={styles.usageLabel}>
-          Temps d'écran {usageOk ? "✅ partagé" : "non activé"}
+
+      <View style={s.usageChip}>
+        <Text style={s.usageTxt}>
+          ⏱️ Temps d'écran {usageOk ? "partagé ✅" : "non activé"}
         </Text>
         {!usageOk && (
-          <TouchableOpacity onPress={grantUsage} style={styles.usageBtn}>
-            <Text style={styles.usageBtnTxt}>Autoriser l'accès à l'usage</Text>
+          <TouchableOpacity onPress={grantUsage}>
+            <Text style={s.usageLink}>Activer</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      <TouchableOpacity onPress={handleUnpair} style={styles.link}>
-        <Text style={styles.linkText}>Dissocier cet appareil</Text>
+      <TouchableOpacity onPress={handleUnpair} style={{ marginTop: 18 }}>
+        <Text style={s.unpair}>Dissocier cet appareil</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  center: {
+const s = StyleSheet.create({
+  screen: {
     flexGrow: 1,
-    backgroundColor: "#fff",
+    backgroundColor: C.bg,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    padding: 26,
   },
-  title: { fontSize: 28, fontWeight: "800", color: "#1f2440", marginBottom: 8 },
-  subtitle: {
-    fontSize: 15,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 24,
+  mascotWrap: { alignItems: "center", marginBottom: 14 },
+  mascotRing: {
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    backgroundColor: C.mascot,
+    borderWidth: 5,
+    borderColor: C.sun,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  consentText: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 22,
-    marginBottom: 28,
-    textAlign: "left",
+  mascotName: { marginTop: 8, color: C.muted, fontSize: 13, fontWeight: "600" },
+  h1: { fontSize: 26, fontWeight: "900", color: C.ink, textAlign: "center", marginBottom: 6 },
+  sub: { fontSize: 15, color: C.muted, textAlign: "center", marginBottom: 20, paddingHorizontal: 10 },
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 22,
+    width: "100%",
+    maxWidth: 380,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  input: {
-    fontSize: 32,
-    letterSpacing: 8,
+  cardText: { fontSize: 15, color: C.ink, lineHeight: 24 },
+  code: {
+    fontSize: 34,
+    letterSpacing: 6,
+    fontWeight: "800",
+    color: C.ink,
+    backgroundColor: C.card,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    minWidth: 260,
+    marginBottom: 22,
     borderWidth: 2,
-    borderColor: "#6B4EE6",
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginBottom: 24,
-    minWidth: 220,
+    borderColor: "#EEE6FB",
   },
-  btn: {
-    backgroundColor: "#6B4EE6",
-    paddingVertical: 14,
-    paddingHorizontal: 40,
+  bigBtn: {
+    paddingVertical: 17,
+    paddingHorizontal: 44,
     borderRadius: 999,
+    minWidth: 240,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  bigBtnTxt: { color: "#fff", fontSize: 18, fontWeight: "900" },
   sos: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#ef4444",
+    width: 184,
+    height: 184,
+    borderRadius: 92,
+    backgroundColor: C.sos,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 28,
-    shadowColor: "#ef4444",
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    marginVertical: 22,
+    shadowColor: C.sos,
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
   },
-  sosText: { color: "#fff", fontSize: 32, fontWeight: "900" },
-  link: { marginTop: 20 },
-  linkText: { color: "#9ca3af", fontSize: 14 },
-  usageBox: { marginTop: 24, alignItems: "center" },
-  usageLabel: { color: "#6b7280", fontSize: 13, marginBottom: 8 },
-  usageBtn: {
+  sosTxt: { color: "#fff", fontSize: 46, fontWeight: "900", letterSpacing: 2 },
+  sosSub: { color: "#fff", fontSize: 13, fontWeight: "600", marginTop: 2, opacity: 0.95 },
+  pausePill: {
+    backgroundColor: C.card,
+    paddingVertical: 13,
+    paddingHorizontal: 26,
+    borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: "#6B4EE6",
-    paddingVertical: 9,
-    paddingHorizontal: 18,
+    borderColor: "#EEE6FB",
+  },
+  pausePillTxt: { color: C.ink, fontWeight: "800", fontSize: 15 },
+  usageChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 16,
+    backgroundColor: "#FFF",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 999,
   },
-  usageBtnTxt: { color: "#6B4EE6", fontWeight: "700", fontSize: 13 },
+  usageTxt: { color: C.muted, fontSize: 13, fontWeight: "600" },
+  usageLink: { color: C.violet, fontSize: 13, fontWeight: "800" },
+  unpair: { color: "#C4BED6", fontSize: 13 },
 });
