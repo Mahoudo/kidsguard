@@ -10,8 +10,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
 import type { Session } from "@supabase/supabase-js";
+import { MapPanel, type MapPanelHandle } from "../components/map-panel";
 import { supabase } from "../../lib/supabase";
 import {
   createChild,
@@ -28,20 +28,6 @@ import {
   type ChildWithLocation,
   type PlaceOverview,
 } from "../../lib/api";
-
-// Free OpenStreetMap raster tiles — no API key, no billing.
-const OSM_STYLE: any = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
 
 export default function HomeScreen() {
   const [session, setSession] = useState<Session | null>(null);
@@ -137,7 +123,7 @@ function Dashboard() {
   const [places, setPlaces] = useState<PlaceOverview[]>([]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<MapPanelHandle>(null);
 
   async function refresh() {
     try {
@@ -190,16 +176,12 @@ function Dashboard() {
   }, []);
 
   async function addZone() {
-    let c: any;
-    try {
-      c = await mapRef.current?.getCenter?.();
-    } catch {}
-    const lng = Array.isArray(c) ? c[0] : (c?.longitude ?? c?.lng);
-    const lat = Array.isArray(c) ? c[1] : (c?.latitude ?? c?.lat);
-    if (lng == null || lat == null) {
+    const c = await mapRef.current?.getCenter();
+    if (!c) {
       Alert.alert("Carte", "Carte pas prête — réessaie.");
       return;
     }
+    const [lng, lat] = c;
     try {
       await createPlace({
         name: "Nouvelle zone",
@@ -238,21 +220,7 @@ function Dashboard() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Map ref={mapRef} style={{ flex: 1 }} mapStyle={OSM_STYLE}>
-        <Camera center={center} zoom={12} />
-        {places.map((p) => (
-          <Marker key={p.id} id={`zone-${p.id}`} lngLat={[p.lng, p.lat]}>
-            <View style={styles.zoneDot} />
-          </Marker>
-        ))}
-        {located.map((c) => (
-          <Marker key={c.id} id={`kid-${c.id}`} lngLat={[c.lng!, c.lat!]}>
-            <View style={styles.pin}>
-              <Text style={styles.pinTxt}>🧒</Text>
-            </View>
-          </Marker>
-        ))}
-      </Map>
+      <MapPanel ref={mapRef} located={located} places={places} center={center} />
 
       <SafeAreaView edges={["bottom"]} style={styles.sheet}>
         <View style={styles.sheetHeader}>
