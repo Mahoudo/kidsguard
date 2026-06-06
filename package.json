@@ -2,7 +2,7 @@
   "name": "kidsguard",
   "version": "0.0.1",
   "private": true,
-  "packageManager": "pnpm@9.12.0",
+  "packageManager": "pnpm@11.4.0",
   "engines": {
     "node": ">=20"
   },
