@@ -11,6 +11,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
-config.resolver.disableHierarchicalLookup = true;
+// pnpm uses a symlinked (.pnpm) layout — let Metro walk symlinks to resolve
+// transitive deps. Do NOT disable hierarchical lookup (breaks @expo/metro-runtime).
 
 module.exports = config;
