@@ -18,8 +18,10 @@ import { supabase } from "../../lib/supabase";
 import { useTheme, type Theme } from "../theme";
 import {
   createChild,
+  createGuardianInvite,
   createPlace,
   getEmergencyPhone,
+  redeemGuardianInvite,
   setEmergencyPhone,
   fetchChildren,
   fetchGeofenceFeed,
@@ -147,6 +149,32 @@ function Dashboard() {
   const [emPhone, setEmPhone] = useState<string | null>(null);
   const [editPhone, setEditPhone] = useState(false);
   const [phoneVal, setPhoneVal] = useState("");
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+
+  async function inviteGuardian() {
+    try {
+      const code = await createGuardianInvite();
+      Alert.alert(
+        "Inviter un tuteur",
+        `Donne ce code à l'autre adulte (valide 24h) :\n\n${code}\n\nIl le saisit dans "Rejoindre une famille".`
+      );
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function joinFamily() {
+    try {
+      await redeemGuardianInvite(joinCode.trim());
+      setJoinOpen(false);
+      setJoinCode("");
+      await refresh();
+      Alert.alert("Famille rejointe ✅", "Tu suis maintenant ces enfants.");
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
   const mapRef = useRef<MapPanelHandle>(null);
   const lastTap = useRef<{ id: string; t: number }>({ id: "", t: 0 });
   const lastSosId = useRef<string | null>(null);
@@ -385,12 +413,37 @@ function Dashboard() {
           }}
         />
 
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 18, marginTop: 12 }}>
+          <TouchableOpacity onPress={inviteGuardian}>
+            <Text style={s.link}>👥 Inviter un tuteur</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setJoinOpen((v) => !v)}>
+            <Text style={s.link}>Rejoindre une famille</Text>
+          </TouchableOpacity>
+        </View>
+        {joinOpen && (
+          <View style={[s.addRow, { marginTop: 8 }]}>
+            <TextInput
+              style={[s.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="Code tuteur (6 chiffres)"
+              placeholderTextColor={t.muted}
+              keyboardType="number-pad"
+              maxLength={6}
+              value={joinCode}
+              onChangeText={setJoinCode}
+            />
+            <TouchableOpacity style={s.btnSm} onPress={joinFamily}>
+              <Text style={s.btnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <TouchableOpacity
           onPress={() => {
             setPhoneVal(emPhone ?? "");
             setEditPhone((v) => !v);
           }}
-          style={{ marginTop: 10 }}
+          style={{ marginTop: 12 }}
         >
           <Text style={[s.muted, { textAlign: "center" }]}>
             📞 Numéro d'urgence (SOS hors-ligne) : {emPhone ?? "définir"}

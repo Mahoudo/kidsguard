@@ -49,6 +49,22 @@ export async function getEmergencyPhone(): Promise<string | null> {
   return (data as string) ?? null;
 }
 
+/** Multi-guardian: invite another adult to follow this family. */
+export async function createGuardianInvite(): Promise<string> {
+  const familyId = await ensureFamily();
+  const { data, error } = await supabase.rpc("create_guardian_invite", {
+    p_family: familyId,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Join an existing family as a guardian via an invite code. */
+export async function redeemGuardianInvite(code: string): Promise<void> {
+  const { error } = await supabase.rpc("redeem_guardian_invite", { p_code: code });
+  if (error) throw error;
+}
+
 /** Create a child + return it (with pairing_code to display). */
 export async function createChild(name: string): Promise<Child> {
   const familyId = await ensureFamily();
