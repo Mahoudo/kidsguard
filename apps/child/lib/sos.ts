@@ -1,6 +1,23 @@
 import * as Location from "expo-location";
 import * as Battery from "expo-battery";
+import * as SMS from "expo-sms";
 import { supabase } from "./supabase";
+import { getEmergencyPhone } from "./emergency";
+
+/** Offline fallback: open an SMS to the cached emergency number with a map link.
+ *  Returns true if the SMS composer was opened. */
+export async function sendSosSms(): Promise<boolean> {
+  const phone = await getEmergencyPhone();
+  if (!phone) return false;
+  if (!(await SMS.isAvailableAsync())) return false;
+  const pos = await Location.getLastKnownPositionAsync().catch(() => null);
+  const link = pos
+    ? `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`
+    : "";
+  const msg = `🆘 SOS ! J'ai besoin d'aide.${link ? " Ma position : " + link : ""}`;
+  await SMS.sendSMSAsync([phone], msg);
+  return true;
+}
 
 /**
  * Raise an SOS as fast as possible. SOS is time-critical, so we use the LAST

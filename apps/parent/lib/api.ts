@@ -30,6 +30,25 @@ export async function ensureFamily(): Promise<string> {
   return created.id;
 }
 
+/** Family emergency phone (used by the child for offline SOS-by-SMS). */
+export async function setEmergencyPhone(phone: string): Promise<void> {
+  const familyId = await ensureFamily();
+  const { error } = await supabase.rpc("set_emergency_phone", {
+    p_family: familyId,
+    p_phone: phone,
+  });
+  if (error) throw error;
+}
+
+export async function getEmergencyPhone(): Promise<string | null> {
+  const familyId = await ensureFamily();
+  const { data, error } = await supabase.rpc("get_emergency_phone", {
+    p_family: familyId,
+  });
+  if (error) throw error;
+  return (data as string) ?? null;
+}
+
 /** Create a child + return it (with pairing_code to display). */
 export async function createChild(name: string): Promise<Child> {
   const familyId = await ensureFamily();

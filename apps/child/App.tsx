@@ -19,8 +19,9 @@ import {
   stopTracking,
 } from "./lib/location";
 import { startCommandListener, stopCommandListener } from "./lib/commands";
-import { raiseSos } from "./lib/sos";
+import { raiseSos, sendSosSms } from "./lib/sos";
 import { sendCheckin, type Mood } from "./lib/checkin";
+import { cacheEmergencyPhone } from "./lib/emergency";
 import { giveConsent, hasConsent } from "./lib/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "./lib/usage";
 
@@ -115,6 +116,7 @@ function AppInner() {
       if (id) {
         setTracking(await isTracking());
         sendCurrentPosition();
+        cacheEmergencyPhone(); // cache for offline SOS-by-SMS
       }
       setLoading(false);
     })();
@@ -196,7 +198,13 @@ function AppInner() {
       await raiseSos(childId);
       Alert.alert("SOS envoyé ✅", "Tes parents sont prévenus, ne bouge pas.");
     } catch (e: any) {
-      Alert.alert("Erreur", e.message ?? String(e));
+      // No data connection? Fall back to an emergency SMS.
+      const sent = await sendSosSms().catch(() => false);
+      if (sent) {
+        Alert.alert("SOS par SMS 📩", "Pas d'internet — envoie le SMS d'urgence (déjà prêt).");
+      } else {
+        Alert.alert("Erreur", e.message ?? String(e));
+      }
     }
   }
 

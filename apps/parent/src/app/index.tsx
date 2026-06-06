@@ -19,6 +19,8 @@ import { useTheme, type Theme } from "../theme";
 import {
   createChild,
   createPlace,
+  getEmergencyPhone,
+  setEmergencyPhone,
   fetchChildren,
   fetchGeofenceFeed,
   fetchPlaces,
@@ -142,6 +144,9 @@ function Dashboard() {
   const [places, setPlaces] = useState<PlaceOverview[]>([]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
+  const [emPhone, setEmPhone] = useState<string | null>(null);
+  const [editPhone, setEditPhone] = useState(false);
+  const [phoneVal, setPhoneVal] = useState("");
   const mapRef = useRef<MapPanelHandle>(null);
   const lastTap = useRef<{ id: string; t: number }>({ id: "", t: 0 });
   const lastSosId = useRef<string | null>(null);
@@ -186,11 +191,26 @@ function Dashboard() {
 
   async function refresh() {
     try {
-      const [ch, pl] = await Promise.all([fetchChildren(), fetchPlaces()]);
+      const [ch, pl, ph] = await Promise.all([
+        fetchChildren(),
+        fetchPlaces(),
+        getEmergencyPhone().catch(() => null),
+      ]);
       setChildren(ch);
       setPlaces(pl);
+      setEmPhone(ph);
     } catch (e: any) {
       console.warn(e.message);
+    }
+  }
+
+  async function savePhone() {
+    try {
+      await setEmergencyPhone(phoneVal.trim());
+      setEmPhone(phoneVal.trim() || null);
+      setEditPhone(false);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
     }
   }
 
@@ -365,7 +385,34 @@ function Dashboard() {
           }}
         />
 
-        <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 10 }}>
+        <TouchableOpacity
+          onPress={() => {
+            setPhoneVal(emPhone ?? "");
+            setEditPhone((v) => !v);
+          }}
+          style={{ marginTop: 10 }}
+        >
+          <Text style={[s.muted, { textAlign: "center" }]}>
+            📞 Numéro d'urgence (SOS hors-ligne) : {emPhone ?? "définir"}
+          </Text>
+        </TouchableOpacity>
+        {editPhone && (
+          <View style={[s.addRow, { marginTop: 8 }]}>
+            <TextInput
+              style={[s.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="+225 07 00 00 00 00"
+              placeholderTextColor={t.muted}
+              keyboardType="phone-pad"
+              value={phoneVal}
+              onChangeText={setPhoneVal}
+            />
+            <TouchableOpacity style={s.btnSm} onPress={savePhone}>
+              <Text style={s.btnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 12 }}>
           <Text style={[s.muted, { textAlign: "center" }]}>Déconnexion</Text>
         </TouchableOpacity>
       </SafeAreaView>
