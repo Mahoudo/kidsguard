@@ -1,0 +1,39 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# turbo
+.turbo/
+
+# expo
+.expo/
+dist/
+web-build/
+*.orig.*
+.expo-shared/
+
+# native
+ios/
+android/
+*.keystore
+*.jks
+
+# env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+google-services.json
+GoogleService-Info.plist
+
+# supabase
+supabase/.branches/
+supabase/.temp/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
