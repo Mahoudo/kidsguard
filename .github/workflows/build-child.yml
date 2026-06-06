@@ -1,0 +1,56 @@
+name: Build Child APK
+
+# Builds the KidsGuard child app APK on Linux (avoids Windows+pnpm path bug
+# and the EAS Free build quota). Download the APK from the run's artifacts.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "apps/child/**"
+      - ".github/workflows/build-child.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Write env
+        working-directory: apps/child
+        run: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=https://klpycbepbezfnmzuszgi.supabase.co" > .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_oHloa0R08RYmqyfRPnqBaw_6pavEbze" >> .env
+
+      - name: Prebuild (generate android/)
+        working-directory: apps/child
+        run: npx expo prebuild -p android --no-install
+
+      - name: Install required NDK
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
+
+      - name: Gradle assembleRelease
+        working-directory: apps/child/android
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kidsguard-child-apk
+          path: apps/child/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
