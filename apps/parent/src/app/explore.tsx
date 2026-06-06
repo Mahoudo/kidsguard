@@ -11,16 +11,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, type Theme } from "../theme";
 import {
+  fetchCheckins,
   fetchGeofenceFeed,
   fetchSos,
   resolveSos,
+  subscribeCheckins,
   subscribeGeofence,
   subscribeSos,
 } from "../../lib/api";
 
 type Item =
   | { kind: "geo"; id: string; at: string; child: string; dir: "enter" | "exit"; place: string }
-  | { kind: "sos"; id: string; sosId: string; at: string; child: string; resolved: boolean };
+  | { kind: "sos"; id: string; sosId: string; at: string; child: string; resolved: boolean }
+  | { kind: "check"; id: string; at: string; child: string; mood: string | null; ckind: string };
+
+const MOOD: Record<string, string> = { happy: "😀", ok: "🙂", sad: "😟" };
 
 export default function AlertsScreen() {
   const t = useTheme();
@@ -31,9 +36,10 @@ export default function AlertsScreen() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [geo, sos] = await Promise.all([
+      const [geo, sos, checks] = await Promise.all([
         fetchGeofenceFeed(100).catch(() => []),
         fetchSos(50).catch(() => []),
+        fetchCheckins(50).catch(() => []),
       ]);
       const merged: Item[] = [
         ...geo.map((g) => ({
@@ -52,6 +58,14 @@ export default function AlertsScreen() {
           child: x.child_name,
           resolved: !!x.resolved_at,
         })),
+        ...checks.map((k) => ({
+          kind: "check" as const,
+          id: "k" + k.id,
+          at: k.created_at,
+          child: k.child_name,
+          mood: k.mood,
+          ckind: k.kind,
+        })),
       ].sort((a, b) => b.at.localeCompare(a.at));
       setItems(merged);
     } finally {
@@ -64,10 +78,12 @@ export default function AlertsScreen() {
     const poll = setInterval(load, 15_000);
     const u1 = subscribeGeofence(load);
     const u2 = subscribeSos(load);
+    const u3 = subscribeCheckins(load);
     return () => {
       clearInterval(poll);
       u1();
       u2();
+      u3();
     };
   }, [load]);
 
@@ -117,6 +133,20 @@ export default function AlertsScreen() {
                     <Text style={s.resolveTxt}>Résoudre</Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            );
+          }
+          if (item.kind === "check") {
+            return (
+              <View style={s.card}>
+                <Text style={s.dot}>{item.mood ? MOOD[item.mood] ?? "💚" : "💚"}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.title}>
+                    {item.child}{" "}
+                    {item.ckind === "arrived" ? "est bien arrivé(e)" : "va bien"}
+                  </Text>
+                  <Text style={s.muted}>{new Date(item.at).toLocaleString("fr-FR")}</Text>
+                </View>
               </View>
             );
           }

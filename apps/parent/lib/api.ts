@@ -228,3 +228,34 @@ export function subscribeSos(onChange: () => void) {
     supabase.removeChannel(channel);
   };
 }
+
+// ---- Check-ins ("I'm safe") ----------------------------------------------
+
+export interface CheckinEvent {
+  id: number;
+  child_id: string;
+  child_name: string;
+  kind: string; // 'safe' | 'arrived'
+  mood: string | null; // 'happy' | 'ok' | 'sad'
+  created_at: string;
+}
+
+export async function fetchCheckins(limit = 50): Promise<CheckinEvent[]> {
+  const { data, error } = await supabase.rpc("checkins_feed", { p_limit: limit });
+  if (error) throw error;
+  return (data ?? []) as CheckinEvent[];
+}
+
+export function subscribeCheckins(onChange: () => void) {
+  const channel = supabase
+    .channel(`checkins-stream-${++channelSeq}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "checkins" },
+      () => onChange()
+    )
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

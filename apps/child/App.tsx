@@ -20,6 +20,7 @@ import {
 } from "./lib/location";
 import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos } from "./lib/sos";
+import { sendCheckin, type Mood } from "./lib/checkin";
 import { giveConsent, hasConsent } from "./lib/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "./lib/usage";
 
@@ -199,6 +200,15 @@ function AppInner() {
     }
   }
 
+  async function doCheckin(kind: "safe" | "arrived", mood?: Mood) {
+    try {
+      await sendCheckin(kind, mood);
+      Alert.alert("Envoyé 💚", "Tes parents savent que tout va bien.");
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
   async function handleUnpair() {
     await stopTracking();
     stopCommandListener();
@@ -281,6 +291,24 @@ function AppInner() {
         <Text style={s.sosTxt}>SOS</Text>
         <Text style={s.sosSub}>en cas de danger</Text>
       </TouchableOpacity>
+
+      <View style={s.checkCard}>
+        <Text style={s.checkTitle}>Dis que tout va bien 💚</Text>
+        <View style={s.moodRow}>
+          <TouchableOpacity style={s.moodBtn} onPress={() => doCheckin("safe", "happy")}>
+            <Text style={s.moodEmoji}>😀</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.moodBtn} onPress={() => doCheckin("safe", "ok")}>
+            <Text style={s.moodEmoji}>🙂</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.moodBtn} onPress={() => doCheckin("safe", "sad")}>
+            <Text style={s.moodEmoji}>😟</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={s.arrivedBtn} onPress={() => doCheckin("arrived")}>
+          <Text style={s.arrivedTxt}>📍 Je suis arrivé(e)</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity style={s.pausePill} onPress={toggleTracking} disabled={busy}>
         <Text style={s.pausePillTxt}>
@@ -384,6 +412,37 @@ const s = StyleSheet.create({
   },
   sosTxt: { color: "#fff", fontSize: 46, fontWeight: "900", letterSpacing: 2 },
   sosSub: { color: "#fff", fontSize: 13, fontWeight: "600", marginTop: 2, opacity: 0.95 },
+  checkCard: {
+    backgroundColor: C.card,
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 18,
+    width: "100%",
+    maxWidth: 380,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  checkTitle: { fontSize: 15, fontWeight: "800", color: C.ink, marginBottom: 12 },
+  moodRow: { flexDirection: "row", gap: 14, marginBottom: 14 },
+  moodBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: C.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  moodEmoji: { fontSize: 30 },
+  arrivedBtn: {
+    backgroundColor: C.green,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 999,
+  },
+  arrivedTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
   pausePill: {
     backgroundColor: C.card,
     paddingVertical: 13,
