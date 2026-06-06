@@ -107,6 +107,21 @@ export async function fetchChildTrack(
   return (data ?? []) as TrackPoint[];
 }
 
+export interface UsageRow {
+  package: string;
+  app_name: string;
+  total_ms: number;
+}
+
+/** A child's per-app screen time for today (most used first). */
+export async function fetchUsage(childId: string): Promise<UsageRow[]> {
+  const { data, error } = await supabase.rpc("usage_for_child", {
+    p_child: childId,
+  });
+  if (error) throw error;
+  return (data ?? []) as UsageRow[];
+}
+
 // ---- Geofencing -----------------------------------------------------------
 
 export interface PlaceOverview {

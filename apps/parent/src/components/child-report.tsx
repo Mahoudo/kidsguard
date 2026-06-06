@@ -14,10 +14,12 @@ import {
   fetchChildren,
   fetchGeofenceFeed,
   fetchSos,
+  fetchUsage,
   type ChildWithLocation,
   type GeofenceEvent,
   type SosEvent,
   type TrackPoint,
+  type UsageRow,
 } from "../../lib/api";
 
 interface Props {
@@ -32,21 +34,24 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   const [track, setTrack] = useState<TrackPoint[]>([]);
   const [geo, setGeo] = useState<GeofenceEvent[]>([]);
   const [sos, setSos] = useState<SosEvent[]>([]);
+  const [usage, setUsage] = useState<UsageRow[]>([]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [kids, t, g, s] = await Promise.all([
+        const [kids, t, g, s, u] = await Promise.all([
           fetchChildren().catch(() => []),
           fetchChildTrack(childId, 50).catch(() => []),
           fetchGeofenceFeed(100).catch(() => []),
           fetchSos(50).catch(() => []),
+          fetchUsage(childId).catch(() => []),
         ]);
         setInfo(kids.find((k) => k.id === childId) ?? null);
         setTrack(t);
         setGeo(g.filter((e) => e.child_id === childId));
         setSos(s.filter((e) => e.child_id === childId));
+        setUsage(u);
       } finally {
         setLoading(false);
       }
@@ -54,6 +59,11 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   }, [childId]);
 
   const fmt = (iso: string) => new Date(iso).toLocaleString("fr-FR");
+  const dur = (ms: number) => {
+    const m = Math.round(ms / 60000);
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}min` : `${m}min`;
+  };
+  const totalScreen = usage.reduce((a, b) => a + b.total_ms, 0);
 
   // Android hardware back closes the report (it's an overlay, not a route).
   useEffect(() => {
@@ -98,6 +108,23 @@ export function ChildReport({ childId, childName, onClose }: Props) {
               </Text>
             ) : (
               <Text style={styles.muted}>Pas encore localisé.</Text>
+            )}
+          </Section>
+
+          <Section title={`Temps d'écran aujourd'hui (${dur(totalScreen)})`}>
+            {usage.length === 0 ? (
+              <Text style={styles.muted}>
+                Aucune donnée. Active l'accès à l'usage sur le téléphone de l'enfant.
+              </Text>
+            ) : (
+              usage.slice(0, 12).map((u) => (
+                <View key={u.package} style={styles.usageRow}>
+                  <Text style={styles.usageApp} numberOfLines={1}>
+                    {u.app_name}
+                  </Text>
+                  <Text style={styles.usageDur}>{dur(u.total_ms)}</Text>
+                </View>
+              ))
             )}
           </Section>
 
@@ -205,4 +232,14 @@ const styles = StyleSheet.create({
   line: { fontSize: 14, color: "#374151", lineHeight: 22 },
   lineSmall: { fontSize: 12, color: "#6b7280", lineHeight: 20 },
   muted: { color: "#9ca3af", fontSize: 12 },
+  usageRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#f0f0f4",
+  },
+  usageApp: { fontSize: 14, color: "#1f2440", flex: 1, marginRight: 10 },
+  usageDur: { fontSize: 13, fontWeight: "700", color: "#6B4EE6" },
 });

@@ -21,6 +21,7 @@ import {
 import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos } from "./lib/sos";
 import { giveConsent, hasConsent } from "./lib/consent";
+import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "./lib/usage";
 import { Component, type ReactNode } from "react";
 
 // App-wide error boundary: any render/effect crash shows a message, not a close.
@@ -62,6 +63,7 @@ function AppInner() {
   const [code, setCode] = useState("");
   const [tracking, setTracking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [usageOk, setUsageOk] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -83,6 +85,34 @@ function AppInner() {
       return () => stopCommandListener();
     }
   }, [childId]);
+
+  // Screen-time: report per-app usage to the parent (Android, needs access).
+  useEffect(() => {
+    if (!childId) return;
+    let ok = false;
+    try {
+      ok = hasUsagePermission();
+    } catch {}
+    setUsageOk(ok);
+    if (ok) syncUsage();
+    const iv = setInterval(() => {
+      try {
+        if (hasUsagePermission()) {
+          setUsageOk(true);
+          syncUsage();
+        }
+      } catch {}
+    }, 60_000);
+    return () => clearInterval(iv);
+  }, [childId]);
+
+  function grantUsage() {
+    try {
+      openUsageAccessSettings();
+    } catch (e: any) {
+      Alert.alert("Indisponible", e?.message ?? "Fonction Android uniquement.");
+    }
+  }
 
   async function handleConsent() {
     await giveConsent();
@@ -217,6 +247,17 @@ function AppInner() {
           {tracking ? "Mettre en pause" : "Reprendre"}
         </Text>
       </TouchableOpacity>
+      <View style={styles.usageBox}>
+        <Text style={styles.usageLabel}>
+          Temps d'écran {usageOk ? "✅ partagé" : "non activé"}
+        </Text>
+        {!usageOk && (
+          <TouchableOpacity onPress={grantUsage} style={styles.usageBtn}>
+            <Text style={styles.usageBtnTxt}>Autoriser l'accès à l'usage</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <TouchableOpacity onPress={handleUnpair} style={styles.link}>
         <Text style={styles.linkText}>Dissocier cet appareil</Text>
       </TouchableOpacity>
@@ -281,4 +322,14 @@ const styles = StyleSheet.create({
   sosText: { color: "#fff", fontSize: 32, fontWeight: "900" },
   link: { marginTop: 20 },
   linkText: { color: "#9ca3af", fontSize: 14 },
+  usageBox: { marginTop: 24, alignItems: "center" },
+  usageLabel: { color: "#6b7280", fontSize: 13, marginBottom: 8 },
+  usageBtn: {
+    borderWidth: 1.5,
+    borderColor: "#6B4EE6",
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+  },
+  usageBtnTxt: { color: "#6B4EE6", fontWeight: "700", fontSize: 13 },
 });
