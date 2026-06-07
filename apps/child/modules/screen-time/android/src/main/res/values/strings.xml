@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="kidsguard_accessibility_desc">Permet à KidsGuard d\'appliquer les limites d\'applications et les modes Focus (Études / Sommeil) définis par les parents. Aucun contenu n\'est lu.</string>
+</resources>

@@ -12,9 +12,11 @@ web-build/
 *.orig.*
 .expo-shared/
 
-# native
-ios/
-android/
+# native (expo prebuild output — app dirs only, NOT local module sources)
+/apps/child/ios/
+/apps/child/android/
+/apps/parent/ios/
+/apps/parent/android/
 *.keystore
 *.jks
 
