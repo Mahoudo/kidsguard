@@ -2,6 +2,7 @@ package expo.modules.screentime
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.time.LocalTime
@@ -37,13 +38,31 @@ class AppBlockerService : AccessibilityService() {
     val locked = prefs.getBoolean("locked", false)
     val blocked = prefs.getStringSet("blocked", emptySet()) ?: emptySet()
 
-    val shouldBlock = locked || inFocusWindow(prefs) || blocked.contains(pkg)
-    if (shouldBlock) {
+    // When locked / lost, take over: bring KidsGuard to the front so the child
+    // sees the lock message. For focus windows or a single blocked app, a
+    // gentler bounce to the home screen is enough.
+    if (locked) {
+      launchKidsGuard()
+    } else if (inFocusWindow(prefs) || blocked.contains(pkg)) {
       performGlobalAction(GLOBAL_ACTION_HOME)
     }
   }
 
   override fun onInterrupt() {}
+
+  private fun launchKidsGuard() {
+    try {
+      val intent = packageManager.getLaunchIntentForPackage(packageName)
+      if (intent != null) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+      } else {
+        performGlobalAction(GLOBAL_ACTION_HOME)
+      }
+    } catch (e: Exception) {
+      performGlobalAction(GLOBAL_ACTION_HOME)
+    }
+  }
 
   // Settings app-info page or the package installer (uninstall dialog).
   private fun isUninstallSurface(pkg: String): Boolean {
