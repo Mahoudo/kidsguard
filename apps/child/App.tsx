@@ -44,6 +44,19 @@ const C = {
   card: "#FFFFFF",
 };
 
+const SHARED = [
+  { icon: "📍", label: "Ma position", detail: "Temps réel + zones (école, maison…)" },
+  { icon: "🔋", label: "Ma batterie", detail: "Niveau de batterie" },
+  { icon: "🆘", label: "Mes SOS", detail: "Seulement quand TU appuies sur SOS" },
+  { icon: "💚", label: "Mes check-ins", detail: "Seulement quand TU dis que tout va bien" },
+  { icon: "⏱️", label: "Temps d'écran", detail: "Temps par appli (si activé)" },
+  { icon: "🛡️", label: "Limites d'apps", detail: "Posées par tes parents (Focus, blocage)" },
+];
+const NOT_SHARED = [
+  "Tes SMS", "Tes appels", "Tes photos",
+  "Ton micro", "Ta caméra", "Tes messages privés",
+];
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) {
@@ -116,6 +129,7 @@ function AppInner() {
   const [usageOk, setUsageOk] = useState(false);
   const [locked, setLocked] = useState(false);
   const [accessOk, setAccessOk] = useState(false);
+  const [showShared, setShowShared] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -320,6 +334,38 @@ function AppInner() {
     );
   }
 
+  // ----- Transparency: what is shared -----
+  if (showShared) {
+    return (
+      <ScrollView contentContainerStyle={s.screen}>
+        <StatusBar style="dark" />
+        <Mascot face="🦁" />
+        <Text style={s.h1}>Ce que je partage</Text>
+        <Text style={s.sub}>En toute transparence 💚</Text>
+        <View style={s.card}>
+          {SHARED.map((x) => (
+            <View key={x.label} style={s.shareRow}>
+              <Text style={{ fontSize: 24 }}>{x.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.shareLabel}>{x.label}</Text>
+                <Text style={s.shareDetail}>{x.detail}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+        <View style={[s.card, { borderWidth: 2, borderColor: C.green }]}>
+          <Text style={s.shareLabel}>Tes parents ne voient JAMAIS :</Text>
+          {NOT_SHARED.map((x) => (
+            <Text key={x} style={{ color: C.muted, lineHeight: 24 }}>
+              🚫 {x}
+            </Text>
+          ))}
+        </View>
+        <BigButton label="Retour" color={C.violet} onPress={() => setShowShared(false)} />
+      </ScrollView>
+    );
+  }
+
   // ----- Locked by parent -----
   if (locked) {
     return (
@@ -401,7 +447,11 @@ function AppInner() {
         )}
       </View>
 
-      <TouchableOpacity onPress={handleUnpair} style={{ marginTop: 18 }}>
+      <TouchableOpacity onPress={() => setShowShared(true)} style={{ marginTop: 14 }}>
+        <Text style={s.usageLink}>ℹ️ Ce que je partage</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={handleUnpair} style={{ marginTop: 16 }}>
         <Text style={s.unpair}>Dissocier cet appareil</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -538,5 +588,8 @@ const s = StyleSheet.create({
   },
   usageTxt: { color: C.muted, fontSize: 13, fontWeight: "600" },
   usageLink: { color: C.violet, fontSize: 13, fontWeight: "800" },
+  shareRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  shareLabel: { fontWeight: "800", color: C.ink, fontSize: 14, marginBottom: 4 },
+  shareDetail: { color: C.muted, fontSize: 12 },
   unpair: { color: "#C4BED6", fontSize: 13 },
 });
