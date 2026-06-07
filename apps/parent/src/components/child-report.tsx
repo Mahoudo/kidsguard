@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   BackHandler,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -90,6 +91,23 @@ export function ChildReport({ childId, childName, onClose }: Props) {
       return true;
     });
     return () => sub.remove();
+  }, [onClose]);
+
+  // Web: make the device/browser Back button close the report instead of
+  // navigating away from the page.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    window.history.pushState({ kgReport: true }, "");
+    let popped = false;
+    const onPop = () => {
+      popped = true;
+      onClose();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (!popped) window.history.back(); // closed via button: drop our entry
+    };
   }, [onClose]);
 
   const fmt = (iso: string) => new Date(iso).toLocaleString("fr-FR");

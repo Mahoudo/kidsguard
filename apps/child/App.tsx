@@ -27,6 +27,8 @@ import { getLockState, subscribeLock } from "./lib/lock";
 import {
   isAccessibilityEnabled,
   openAccessibilitySettings,
+  isAdminActive,
+  requestAdmin,
   syncBlockRules,
 } from "./lib/blocker";
 import { giveConsent, hasConsent } from "./lib/consent";
@@ -129,6 +131,7 @@ function AppInner() {
   const [usageOk, setUsageOk] = useState(false);
   const [locked, setLocked] = useState(false);
   const [accessOk, setAccessOk] = useState(false);
+  const [adminOk, setAdminOk] = useState(false);
   const [showShared, setShowShared] = useState(false);
 
   useEffect(() => {
@@ -161,6 +164,7 @@ function AppInner() {
     getLockState().then(setLocked);
     try {
       setAccessOk(isAccessibilityEnabled());
+      setAdminOk(isAdminActive());
     } catch {}
     syncBlockRules();
     const unsubLock = subscribeLock(childId, (v) => {
@@ -170,6 +174,7 @@ function AppInner() {
     const blockIv = setInterval(() => {
       try {
         setAccessOk(isAccessibilityEnabled());
+        setAdminOk(isAdminActive());
       } catch {}
       syncBlockRules();
     }, 30_000);
@@ -442,6 +447,17 @@ function AppInner() {
         </Text>
         {!accessOk && (
           <TouchableOpacity onPress={() => openAccessibilitySettings()}>
+            <Text style={s.usageLink}>Activer</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={[s.usageChip, { marginTop: 10 }]}>
+        <Text style={s.usageTxt}>
+          🔒 Protection anti-retrait {adminOk ? "active ✅" : "non activée"}
+        </Text>
+        {!adminOk && (
+          <TouchableOpacity onPress={() => requestAdmin()}>
             <Text style={s.usageLink}>Activer</Text>
           </TouchableOpacity>
         )}

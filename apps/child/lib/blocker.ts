@@ -3,10 +3,12 @@ import { supabase } from "./supabase";
 import {
   isAccessibilityEnabled,
   openAccessibilitySettings,
+  isAdminActive,
+  requestAdmin,
   setBlockRules,
 } from "../modules/screen-time";
 
-export { isAccessibilityEnabled, openAccessibilitySettings };
+export { isAccessibilityEnabled, openAccessibilitySettings, isAdminActive, requestAdmin };
 
 /** Fetch blocked apps + focus windows + lock state, push them to the native
  *  accessibility service (which enforces them). */

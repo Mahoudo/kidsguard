@@ -3,6 +3,7 @@ package expo.modules.screentime
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import java.time.LocalTime
 
 /**
@@ -19,6 +20,14 @@ class AppBlockerService : AccessibilityService() {
     if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
     val pkg = event.packageName?.toString() ?: return
     if (pkg == packageName) return
+
+    // Anti-uninstall guard: if the child reaches our app-info / uninstall screen
+    // (Settings or the package installer), bounce them home before they confirm.
+    if (isUninstallSurface(pkg) && windowMentionsSelf()) {
+      performGlobalAction(GLOBAL_ACTION_HOME)
+      return
+    }
+
     // never block the launcher, system UI or settings
     if (pkg.contains("launcher") || pkg == "com.android.systemui" ||
       pkg.startsWith("com.android.settings")
@@ -35,6 +44,31 @@ class AppBlockerService : AccessibilityService() {
   }
 
   override fun onInterrupt() {}
+
+  // Settings app-info page or the package installer (uninstall dialog).
+  private fun isUninstallSurface(pkg: String): Boolean {
+    return pkg.startsWith("com.android.settings") ||
+      pkg.contains("packageinstaller") ||
+      pkg.contains("packagemanager")
+  }
+
+  // True if the currently visible window mentions our app (so we only bounce
+  // when KidsGuard itself is the uninstall/app-info target, not other apps).
+  private fun windowMentionsSelf(): Boolean {
+    val root = rootInActiveWindow ?: return false
+    val targets = listOf(packageName, "KidsGuard")
+    return nodeMentions(root, targets)
+  }
+
+  private fun nodeMentions(node: AccessibilityNodeInfo?, targets: List<String>): Boolean {
+    if (node == null) return false
+    val txt = (node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")
+    if (targets.any { txt.contains(it, ignoreCase = true) }) return true
+    for (i in 0 until node.childCount) {
+      if (nodeMentions(node.getChild(i), targets)) return true
+    }
+    return false
+  }
 
   private fun inFocusWindow(prefs: android.content.SharedPreferences): Boolean {
     val now = LocalTime.now()

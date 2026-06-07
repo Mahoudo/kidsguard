@@ -1,7 +1,9 @@
 package expo.modules.screentime
 
 import android.app.AppOpsManager
+import android.app.admin.DevicePolicyManager
 import android.app.usage.UsageStatsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Process
@@ -84,6 +86,28 @@ class ScreenTimeModule : Module() {
     Function("openAccessibilitySettings") {
       val ctx = appContext.reactContext ?: return@Function
       val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      ctx.startActivity(intent)
+    }
+
+    // Is KidsGuard an active device admin? (blocks casual uninstall)
+    Function("isAdminActive") {
+      val ctx = appContext.reactContext ?: return@Function false
+      val dpm = ctx.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+      dpm.isAdminActive(ComponentName(ctx, KidsGuardAdminReceiver::class.java))
+    }
+
+    // Prompt the user to grant device-admin (anti-uninstall protection).
+    Function("requestAdmin") {
+      val ctx = appContext.reactContext ?: return@Function
+      val comp = ComponentName(ctx, KidsGuardAdminReceiver::class.java)
+      val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp)
+        putExtra(
+          DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+          "Active la protection KidsGuard pour empêcher la désinstallation."
+        )
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       }
       ctx.startActivity(intent)

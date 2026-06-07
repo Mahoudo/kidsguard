@@ -28,6 +28,27 @@ const EMPTY: Focus = {
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 
+// Common apps to block — works even when on-device usage stats are empty
+// (some Android skins, e.g. MIUI/HyperOS, return no UsageStats).
+const PRESETS: { package: string; app_name: string }[] = [
+  { package: "com.zhiliaoapp.musically", app_name: "TikTok" },
+  { package: "com.ss.android.ugc.trill", app_name: "TikTok (Lite)" },
+  { package: "com.google.android.youtube", app_name: "YouTube" },
+  { package: "com.instagram.android", app_name: "Instagram" },
+  { package: "com.snapchat.android", app_name: "Snapchat" },
+  { package: "com.whatsapp", app_name: "WhatsApp" },
+  { package: "com.facebook.katana", app_name: "Facebook" },
+  { package: "com.facebook.orca", app_name: "Messenger" },
+  { package: "com.twitter.android", app_name: "X (Twitter)" },
+  { package: "org.telegram.messenger", app_name: "Telegram" },
+  { package: "com.dts.freefireth", app_name: "Free Fire" },
+  { package: "com.tencent.ig", app_name: "PUBG Mobile" },
+  { package: "com.roblox.client", app_name: "Roblox" },
+  { package: "com.netflix.mediaclient", app_name: "Netflix" },
+  { package: "com.discord", app_name: "Discord" },
+  { package: "com.android.chrome", app_name: "Chrome" },
+];
+
 export function ChildControls({
   childId,
   usage,
@@ -39,6 +60,7 @@ export function ChildControls({
   const s = makeStyles(t);
   const [focus, setFoc] = useState<Focus>(EMPTY);
   const [blocked, setBlocked] = useState<Record<string, boolean>>({});
+  const [names, setNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -46,8 +68,13 @@ export function ChildControls({
       if (f) setFoc(f);
       const al = await listAppLimits(childId).catch(() => []);
       const m: Record<string, boolean> = {};
-      al.forEach((x) => (m[x.package] = x.blocked));
+      const nm: Record<string, string> = {};
+      al.forEach((x) => {
+        m[x.package] = x.blocked;
+        nm[x.package] = x.app_name;
+      });
       setBlocked(m);
+      setNames(nm);
     })();
   }, [childId]);
 
@@ -126,7 +153,19 @@ export function ChildControls({
     </View>
   );
 
-  const apps = usage.slice(0, 10);
+  // Merge: apps the child actually used + curated presets + anything already
+  // configured — deduped by package. Lets the parent block apps even when the
+  // device reports no usage data.
+  const seen = new Set<string>();
+  const apps: { package: string; app_name: string }[] = [];
+  const add = (pkg: string, name: string) => {
+    if (!pkg || seen.has(pkg)) return;
+    seen.add(pkg);
+    apps.push({ package: pkg, app_name: name || pkg });
+  };
+  usage.slice(0, 20).forEach((u) => add(u.package, u.app_name));
+  PRESETS.forEach((p) => add(p.package, p.app_name));
+  Object.keys(blocked).forEach((pkg) => add(pkg, names[pkg] ?? pkg));
 
   return (
     <View style={s.card}>

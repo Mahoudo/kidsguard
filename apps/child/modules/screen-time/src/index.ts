@@ -68,6 +68,22 @@ export function openAccessibilitySettings(): void {
   } catch {}
 }
 
+/** Is KidsGuard an active device admin? (anti-uninstall). false if unavailable. */
+export function isAdminActive(): boolean {
+  try {
+    return ScreenTime?.isAdminActive?.() ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** Prompt the user to grant device-admin (anti-uninstall protection). No-op if unavailable. */
+export function requestAdmin(): void {
+  try {
+    ScreenTime?.requestAdmin?.();
+  } catch {}
+}
+
 /** Push the current block rules to the native service (SharedPreferences). */
 export function setBlockRules(r: BlockRules): void {
   try {
