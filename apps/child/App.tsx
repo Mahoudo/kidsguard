@@ -141,6 +141,7 @@ function AppInner() {
   const [adminOk, setAdminOk] = useState(false);
   const [batteryOk, setBatteryOk] = useState(false);
   const [showShared, setShowShared] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -250,6 +251,7 @@ function AppInner() {
       setChildId(id);
       await startTracking();
       setTracking(true);
+      setSetupOpen(true); // open the parent setup panel once, right after pairing
     } catch (e: any) {
       Alert.alert("Oups", e.message ?? String(e));
     } finally {
@@ -456,49 +458,71 @@ function AppInner() {
         </Text>
       </TouchableOpacity>
 
-      <View style={s.usageChip}>
-        <Text style={s.usageTxt}>
-          ⏱️ Temps d'écran {usageOk ? "partagé ✅" : "non activé"}
-        </Text>
-        {!usageOk && (
-          <TouchableOpacity onPress={grantUsage}>
-            <Text style={s.usageLink}>Activer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {(() => {
+        const allReady = usageOk && accessOk && adminOk && batteryOk;
+        return (
+          <>
+            <TouchableOpacity
+              onPress={() => setSetupOpen((v) => !v)}
+              style={{ marginTop: 18 }}
+            >
+              <Text style={s.usageLink}>
+                {allReady
+                  ? "⚙️ Configuration ✅"
+                  : `⚙️ Configuration parent ${setupOpen ? "▲" : "▼"}`}
+              </Text>
+            </TouchableOpacity>
 
-      <View style={[s.usageChip, { marginTop: 10 }]}>
-        <Text style={s.usageTxt}>
-          🛡️ Contrôle parental {accessOk ? "actif ✅" : "non activé"}
-        </Text>
-        {!accessOk && (
-          <TouchableOpacity onPress={() => openAccessibilitySettings()}>
-            <Text style={s.usageLink}>Activer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+            {setupOpen && (
+              <>
+                <View style={[s.usageChip, { marginTop: 10 }]}>
+                  <Text style={s.usageTxt}>
+                    ⏱️ Temps d'écran {usageOk ? "partagé ✅" : "non activé"}
+                  </Text>
+                  {!usageOk && (
+                    <TouchableOpacity onPress={grantUsage}>
+                      <Text style={s.usageLink}>Activer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-      <View style={[s.usageChip, { marginTop: 10 }]}>
-        <Text style={s.usageTxt}>
-          🔒 Protection anti-retrait {adminOk ? "active ✅" : "non activée"}
-        </Text>
-        {!adminOk && (
-          <TouchableOpacity onPress={() => requestAdmin()}>
-            <Text style={s.usageLink}>Activer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+                <View style={[s.usageChip, { marginTop: 10 }]}>
+                  <Text style={s.usageTxt}>
+                    🛡️ Contrôle parental {accessOk ? "actif ✅" : "non activé"}
+                  </Text>
+                  {!accessOk && (
+                    <TouchableOpacity onPress={() => openAccessibilitySettings()}>
+                      <Text style={s.usageLink}>Activer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-      <View style={[s.usageChip, { marginTop: 10 }]}>
-        <Text style={s.usageTxt}>
-          🔋 Rester connecté {batteryOk ? "OK ✅" : "à régler"}
-        </Text>
-        {!batteryOk && (
-          <TouchableOpacity onPress={() => requestDisableBatteryOptimization()}>
-            <Text style={s.usageLink}>Activer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+                <View style={[s.usageChip, { marginTop: 10 }]}>
+                  <Text style={s.usageTxt}>
+                    🔒 Protection anti-retrait {adminOk ? "active ✅" : "non activée"}
+                  </Text>
+                  {!adminOk && (
+                    <TouchableOpacity onPress={() => requestAdmin()}>
+                      <Text style={s.usageLink}>Activer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={[s.usageChip, { marginTop: 10 }]}>
+                  <Text style={s.usageTxt}>
+                    🔋 Rester connecté {batteryOk ? "OK ✅" : "à régler"}
+                  </Text>
+                  {!batteryOk && (
+                    <TouchableOpacity onPress={() => requestDisableBatteryOptimization()}>
+                      <Text style={s.usageLink}>Activer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
+          </>
+        );
+      })()}
 
       <TouchableOpacity onPress={handlePause} style={{ marginTop: 16 }}>
         <Text style={s.usageLink}>⏸️ Demander une pause à mes parents</Text>
