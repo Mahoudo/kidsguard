@@ -34,6 +34,16 @@ export async function presentSosAlert(childName: string): Promise<void> {
   } catch {}
 }
 
+/** Lightweight local notification (e.g. low battery). Safe no-op on web. */
+export async function presentLocalAlert(title: string, body: string): Promise<void> {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, sound: true },
+      trigger: null,
+    });
+  } catch {}
+}
+
 /** Register this device for push and store the Expo token on the parent profile. */
 export async function registerForPush(): Promise<void> {
   if (!Device.isDevice) return; // no push on web / simulators

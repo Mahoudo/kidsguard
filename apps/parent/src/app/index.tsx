@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Linking,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -14,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import { MapPanel, type MapPanelHandle } from "../components/map-panel";
 import { ChildReport } from "../components/child-report";
-import { registerForPush, presentSosAlert } from "../../lib/push";
+import { registerForPush, presentSosAlert, presentLocalAlert } from "../../lib/push";
 import { supabase } from "../../lib/supabase";
 import { useTheme, type Theme } from "../theme";
 import {
@@ -181,6 +182,7 @@ function Dashboard() {
   const mapRef = useRef<MapPanelHandle>(null);
   const lastTap = useRef<{ id: string; t: number }>({ id: "", t: 0 });
   const lastSosId = useRef<string | null>(null);
+  const prevBatt = useRef<Record<string, number>>({});
   const [reportChild, setReportChild] = useState<ChildWithLocation | null>(null);
 
   // Detect a fresh SOS (via realtime OR poll). Vibrate + notify + alert once.
@@ -230,6 +232,17 @@ function Dashboard() {
       setChildren(ch);
       setPlaces(pl);
       setEmPhone(ph);
+      // One-time low-battery alert when a child crosses below 20%.
+      for (const k of ch) {
+        const b = k.last_battery_pct;
+        const prev = prevBatt.current[k.id];
+        if (b != null) {
+          if (prev != null && prev >= 20 && b < 20) {
+            presentLocalAlert("🔋 Batterie faible", `${k.name} : ${b}% — pense à le faire charger.`);
+          }
+          prevBatt.current[k.id] = b;
+        }
+      }
     } catch (e: any) {
       console.warn(e.message);
     }
@@ -287,10 +300,30 @@ function Dashboard() {
       return;
     }
     const [lng, lat] = c;
+    // On web, ask for a real name + type + radius so geofence alerts are meaningful.
+    let name = "Nouvelle zone";
+    let kind = "other";
+    let radiusM = 150;
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const n = window.prompt("Nom de la zone (ex: École, Maison, Église)", "");
+      if (n === null) return; // cancelled
+      if (n.trim()) name = n.trim();
+      const k = (window.prompt("Type : maison / ecole / autre", "autre") || "autre")
+        .trim()
+        .toLowerCase();
+      kind =
+        k === "maison" || k === "home"
+          ? "home"
+          : k === "ecole" || k === "école" || k === "school"
+            ? "school"
+            : "other";
+      const r = parseInt(window.prompt("Rayon en mètres", "150") || "150", 10);
+      if (r && r >= 50 && r <= 2000) radiusM = r;
+    }
     try {
-      await createPlace({ name: "Nouvelle zone", kind: "other", lng, lat, radiusM: 150 });
+      await createPlace({ name, kind, lng, lat, radiusM });
       await refresh();
-      Alert.alert("Zone créée", "Rayon 150 m au centre de la carte.");
+      Alert.alert("Zone créée", `${name} · rayon ${radiusM} m.`);
     } catch (e: any) {
       Alert.alert("Erreur", e.message ?? String(e));
     }
@@ -438,6 +471,9 @@ function Dashboard() {
                       }
                     >
                       <Text style={s.ringText}>🔔</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.ring} onPress={() => setReportChild(item)}>
+                      <Text style={s.ringText}>📊</Text>
                     </TouchableOpacity>
                   </>
                 )}
