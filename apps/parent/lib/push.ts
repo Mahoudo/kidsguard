@@ -20,6 +20,23 @@ export async function presentSosAlert(childName: string): Promise<void> {
   try {
     Vibration.vibrate([0, 600, 300, 600, 300, 900]);
   } catch {}
+  // Web: expo-notifications can't schedule; use the browser Notification API.
+  if (Platform.OS === "web") {
+    try {
+      const N = (globalThis as any).Notification;
+      if (N) {
+        const show = () =>
+          new N("🆘 SOS", {
+            body: `${childName} a déclenché une alerte SOS !`,
+            requireInteraction: true,
+          });
+        if (N.permission === "granted") show();
+        else if (N.permission !== "denied")
+          N.requestPermission().then((p: string) => p === "granted" && show());
+      }
+    } catch {}
+    return;
+  }
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -46,7 +63,16 @@ export async function presentLocalAlert(title: string, body: string): Promise<vo
 
 /** Register this device for push and store the Expo token on the parent profile. */
 export async function registerForPush(): Promise<void> {
-  if (!Device.isDevice) return; // no push on web / simulators
+  // Web: no Expo push token, but ask for browser notification permission so
+  // presentSosAlert can show a real notification bubble while the tab is open.
+  if (Platform.OS === "web") {
+    try {
+      const N = (globalThis as any).Notification;
+      if (N && N.permission === "default") await N.requestPermission();
+    } catch {}
+    return;
+  }
+  if (!Device.isDevice) return; // no push on simulators
 
   const current = await Notifications.getPermissionsAsync();
   let status = current.status;
