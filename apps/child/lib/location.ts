@@ -55,6 +55,23 @@ export async function sendCurrentPosition(): Promise<void> {
   }
 }
 
+// distanceInterval 0 => the OS delivers a point every `timeInterval` even when
+// the child is perfectly still. That steady 60s ping is the "online" heartbeat:
+// the parent sees the device connected as long as the app runs, not only when
+// the child moves. The persistent foreground-service notification keeps the
+// process alive across backgrounding (Family-Link style).
+const TRACK_OPTIONS: Location.LocationTaskOptions = {
+  accuracy: Location.Accuracy.Balanced,
+  timeInterval: 60_000,
+  distanceInterval: 0,
+  pausesUpdatesAutomatically: false,
+  showsBackgroundLocationIndicator: true,
+  foregroundService: {
+    notificationTitle: "KidsGuard actif",
+    notificationBody: "Connecté avec tes parents",
+  },
+};
+
 export async function startTracking(): Promise<void> {
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") {
@@ -63,24 +80,32 @@ export async function startTracking(): Promise<void> {
   // Background permission may be limited/deferred on some OS — best effort.
   await Location.requestBackgroundPermissionsAsync();
 
-  // Push one position right away so the parent sees the child immediately
-  // (background updates only fire on movement / interval).
+  // Push one position right away so the parent sees the child immediately.
   await sendCurrentPosition();
 
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK);
   if (already) return;
 
-  await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: 15_000,
-    distanceInterval: 10,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: "KidsGuard actif",
-      notificationBody: "Partage de position avec tes parents",
-    },
-  });
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, TRACK_OPTIONS);
+}
+
+/**
+ * Called on every app launch: silently (re)start the foreground heartbeat if
+ * permission is already granted — no prompt. Keeps the child "connecté" after
+ * the app is reopened or relaunched by the OS, without user action.
+ */
+export async function ensureTracking(): Promise<void> {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== "granted") return;
+    await sendCurrentPosition();
+    const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK);
+    if (!already) {
+      await Location.startLocationUpdatesAsync(LOCATION_TASK, TRACK_OPTIONS);
+    }
+  } catch (e: any) {
+    console.warn("ensureTracking failed", e?.message);
+  }
 }
 
 export async function stopTracking(): Promise<void> {

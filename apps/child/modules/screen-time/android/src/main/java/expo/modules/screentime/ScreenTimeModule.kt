@@ -6,6 +6,8 @@ import android.app.usage.UsageStatsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import expo.modules.kotlin.modules.Module
@@ -108,6 +110,23 @@ class ScreenTimeModule : Module() {
           DevicePolicyManager.EXTRA_ADD_EXPLANATION,
           "Active la protection KidsGuard pour empêcher la désinstallation."
         )
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      ctx.startActivity(intent)
+    }
+
+    // Is the app exempt from battery optimization? (needed to stay alive in bg)
+    Function("isBatteryUnrestricted") {
+      val ctx = appContext.reactContext ?: return@Function false
+      val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+      pm.isIgnoringBatteryOptimizations(ctx.packageName)
+    }
+
+    // Prompt the user to exempt KidsGuard from battery optimization.
+    Function("requestDisableBatteryOptimization") {
+      val ctx = appContext.reactContext ?: return@Function
+      val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = Uri.parse("package:" + ctx.packageName)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       }
       ctx.startActivity(intent)

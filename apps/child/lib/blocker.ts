@@ -5,10 +5,19 @@ import {
   openAccessibilitySettings,
   isAdminActive,
   requestAdmin,
+  isBatteryUnrestricted,
+  requestDisableBatteryOptimization,
   setBlockRules,
 } from "../modules/screen-time";
 
-export { isAccessibilityEnabled, openAccessibilitySettings, isAdminActive, requestAdmin };
+export {
+  isAccessibilityEnabled,
+  openAccessibilitySettings,
+  isAdminActive,
+  requestAdmin,
+  isBatteryUnrestricted,
+  requestDisableBatteryOptimization,
+};
 
 /** Fetch blocked apps + focus windows + lock state, push them to the native
  *  accessibility service (which enforces them). */

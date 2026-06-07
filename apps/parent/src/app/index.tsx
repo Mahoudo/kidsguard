@@ -362,9 +362,11 @@ function Dashboard() {
             </Text>
           }
           renderItem={({ item }) => {
+            // Heartbeat pings every ~60s; allow a couple of missed pings before
+            // showing the child as offline.
             const online =
               !!item.last_seen_at &&
-              Date.now() - new Date(item.last_seen_at).getTime() < 120_000;
+              Date.now() - new Date(item.last_seen_at).getTime() < 300_000;
             const initial = item.name.trim().charAt(0).toUpperCase() || "?";
             const batt = item.last_battery_pct;
             const battColor =

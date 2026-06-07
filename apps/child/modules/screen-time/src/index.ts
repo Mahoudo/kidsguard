@@ -84,6 +84,22 @@ export function requestAdmin(): void {
   } catch {}
 }
 
+/** Is the app exempt from battery optimization (can run in background)? */
+export function isBatteryUnrestricted(): boolean {
+  try {
+    return ScreenTime?.isBatteryUnrestricted?.() ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** Prompt the user to exempt the app from battery optimization. No-op if unavailable. */
+export function requestDisableBatteryOptimization(): void {
+  try {
+    ScreenTime?.requestDisableBatteryOptimization?.();
+  } catch {}
+}
+
 /** Push the current block rules to the native service (SharedPreferences). */
 export function setBlockRules(r: BlockRules): void {
   try {

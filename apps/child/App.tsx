@@ -14,6 +14,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { getStoredChildId, pairWithCode, unpair } from "./lib/pairing";
 import {
+  ensureTracking,
   isTracking,
   sendCurrentPosition,
   startTracking,
@@ -29,6 +30,8 @@ import {
   openAccessibilitySettings,
   isAdminActive,
   requestAdmin,
+  isBatteryUnrestricted,
+  requestDisableBatteryOptimization,
   syncBlockRules,
 } from "./lib/blocker";
 import { giveConsent, hasConsent } from "./lib/consent";
@@ -132,6 +135,7 @@ function AppInner() {
   const [locked, setLocked] = useState(false);
   const [accessOk, setAccessOk] = useState(false);
   const [adminOk, setAdminOk] = useState(false);
+  const [batteryOk, setBatteryOk] = useState(false);
   const [showShared, setShowShared] = useState(false);
 
   useEffect(() => {
@@ -140,8 +144,8 @@ function AppInner() {
       const id = await getStoredChildId();
       setChildId(id);
       if (id) {
+        await ensureTracking(); // silently resume the heartbeat if permitted
         setTracking(await isTracking());
-        sendCurrentPosition();
         cacheEmergencyPhone(); // cache for offline SOS-by-SMS
       }
       setLoading(false);
@@ -165,6 +169,7 @@ function AppInner() {
     try {
       setAccessOk(isAccessibilityEnabled());
       setAdminOk(isAdminActive());
+      setBatteryOk(isBatteryUnrestricted());
     } catch {}
     syncBlockRules();
     const unsubLock = subscribeLock(childId, (v) => {
@@ -458,6 +463,17 @@ function AppInner() {
         </Text>
         {!adminOk && (
           <TouchableOpacity onPress={() => requestAdmin()}>
+            <Text style={s.usageLink}>Activer</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={[s.usageChip, { marginTop: 10 }]}>
+        <Text style={s.usageTxt}>
+          🔋 Rester connecté {batteryOk ? "OK ✅" : "à régler"}
+        </Text>
+        {!batteryOk && (
+          <TouchableOpacity onPress={() => requestDisableBatteryOptimization()}>
             <Text style={s.usageLink}>Activer</Text>
           </TouchableOpacity>
         )}
