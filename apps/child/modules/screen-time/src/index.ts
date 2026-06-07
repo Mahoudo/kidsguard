@@ -40,3 +40,46 @@ export async function getUsageToday(): Promise<AppUsage[]> {
     return [];
   }
 }
+
+export interface BlockRules {
+  packages: string[];
+  studyEnabled: boolean;
+  studyStart: string | null;
+  studyEnd: string | null;
+  sleepEnabled: boolean;
+  sleepStart: string | null;
+  sleepEnd: string | null;
+  locked: boolean;
+}
+
+/** Is the app-blocker accessibility service enabled? */
+export function isAccessibilityEnabled(): boolean {
+  try {
+    return ScreenTime?.isAccessibilityEnabled?.() ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** Open the OS accessibility settings to enable the blocker. */
+export function openAccessibilitySettings(): void {
+  try {
+    ScreenTime?.openAccessibilitySettings?.();
+  } catch {}
+}
+
+/** Push the current block rules to the native service (SharedPreferences). */
+export function setBlockRules(r: BlockRules): void {
+  try {
+    ScreenTime?.setBlockRules?.(
+      r.packages,
+      r.studyEnabled,
+      r.studyStart,
+      r.studyEnd,
+      r.sleepEnabled,
+      r.sleepStart,
+      r.sleepEnd,
+      r.locked
+    );
+  } catch {}
+}

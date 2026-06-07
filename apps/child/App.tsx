@@ -24,6 +24,11 @@ import { raiseSos, sendSosSms } from "./lib/sos";
 import { sendCheckin, type Mood } from "./lib/checkin";
 import { cacheEmergencyPhone } from "./lib/emergency";
 import { getLockState, subscribeLock } from "./lib/lock";
+import {
+  isAccessibilityEnabled,
+  openAccessibilitySettings,
+  syncBlockRules,
+} from "./lib/blocker";
 import { giveConsent, hasConsent } from "./lib/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "./lib/usage";
 
@@ -110,6 +115,7 @@ function AppInner() {
   const [busy, setBusy] = useState(false);
   const [usageOk, setUsageOk] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [accessOk, setAccessOk] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -139,10 +145,24 @@ function AppInner() {
       },
     });
     getLockState().then(setLocked);
-    const unsubLock = subscribeLock(childId, setLocked);
+    try {
+      setAccessOk(isAccessibilityEnabled());
+    } catch {}
+    syncBlockRules();
+    const unsubLock = subscribeLock(childId, (v) => {
+      setLocked(v);
+      syncBlockRules();
+    });
+    const blockIv = setInterval(() => {
+      try {
+        setAccessOk(isAccessibilityEnabled());
+      } catch {}
+      syncBlockRules();
+    }, 30_000);
     return () => {
       stopCommandListener();
       unsubLock();
+      clearInterval(blockIv);
     };
   }, [childId]);
 
@@ -365,6 +385,17 @@ function AppInner() {
         </Text>
         {!usageOk && (
           <TouchableOpacity onPress={grantUsage}>
+            <Text style={s.usageLink}>Activer</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={[s.usageChip, { marginTop: 10 }]}>
+        <Text style={s.usageTxt}>
+          🛡️ Contrôle parental {accessOk ? "actif ✅" : "non activé"}
+        </Text>
+        {!accessOk && (
+          <TouchableOpacity onPress={() => openAccessibilitySettings()}>
             <Text style={s.usageLink}>Activer</Text>
           </TouchableOpacity>
         )}
