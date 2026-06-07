@@ -1,0 +1,60 @@
+name: Build AAB (Play Store)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [child, parent]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Write env
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=https://klpycbepbezfnmzuszgi.supabase.co" > .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_oHloa0R08RYmqyfRPnqBaw_6pavEbze" >> .env
+
+      - name: Prebuild (generate android/)
+        working-directory: apps/${{ matrix.app }}
+        run: npx expo prebuild -p android --no-install
+
+      - name: Install required NDK
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
+
+      - name: Decode upload keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > ${{ github.workspace }}/upload.keystore
+
+      - name: Gradle bundleRelease (signed AAB)
+        working-directory: apps/${{ matrix.app }}/android
+        run: |
+          ./gradlew :app:bundleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/upload.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kidsguard-${{ matrix.app }}-aab
+          path: apps/${{ matrix.app }}/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
