@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32" />
   <application>
     <service
       android:name="expo.modules.screentime.AppBlockerService"
@@ -23,6 +27,17 @@
         android:resource="@xml/kidsguard_device_admin" />
       <intent-filter>
         <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+      </intent-filter>
+    </receiver>
+
+    <receiver
+      android:name="expo.modules.screentime.BootReceiver"
+      android:enabled="true"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
       </intent-filter>
     </receiver>
   </application>

@@ -24,7 +24,10 @@ import { startCommandListener, stopCommandListener } from "./lib/commands";
 import { raiseSos, sendSosSms } from "./lib/sos";
 import { sendCheckin, type Mood } from "./lib/checkin";
 import { cacheEmergencyPhone } from "./lib/emergency";
-import { getLockState, subscribeLock } from "./lib/lock";
+import { getLockState, getLostNote, subscribeLock } from "./lib/lock";
+import { reportSim } from "./lib/antitheft";
+import { requestPause } from "./lib/pause";
+import { scanAndReportPhotos } from "./lib/photo";
 import {
   isAccessibilityEnabled,
   openAccessibilitySettings,
@@ -133,6 +136,7 @@ function AppInner() {
   const [busy, setBusy] = useState(false);
   const [usageOk, setUsageOk] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [lostNote, setLostNote] = useState<string | null>(null);
   const [accessOk, setAccessOk] = useState(false);
   const [adminOk, setAdminOk] = useState(false);
   const [batteryOk, setBatteryOk] = useState(false);
@@ -147,6 +151,8 @@ function AppInner() {
         await ensureTracking(); // silently resume the heartbeat if permitted
         setTracking(await isTracking());
         cacheEmergencyPhone(); // cache for offline SOS-by-SMS
+        reportSim(); // alert the parent if the SIM was swapped
+        scanAndReportPhotos(); // on-device EXIF privacy check (metadata only)
       }
       setLoading(false);
     })();
@@ -208,6 +214,21 @@ function AppInner() {
     }, 60_000);
     return () => clearInterval(iv);
   }, [childId]);
+
+  // Load the "lost mode" note whenever the device becomes locked.
+  useEffect(() => {
+    if (locked) getLostNote().then(setLostNote);
+    else setLostNote(null);
+  }, [locked]);
+
+  async function handlePause() {
+    try {
+      await requestPause(15);
+      Alert.alert("Demande envoyée", "Tes parents vont recevoir ta demande de pause.");
+    } catch (e: any) {
+      Alert.alert("Oups", e?.message ?? "Réessaie plus tard.");
+    }
+  }
 
   function grantUsage() {
     try {
@@ -381,10 +402,10 @@ function AppInner() {
     return (
       <View style={s.screen}>
         <StatusBar style="dark" />
-        <Mascot face="🔒" />
-        <Text style={s.h1}>Téléphone en pause</Text>
+        <Mascot face={lostNote ? "📵" : "🔒"} />
+        <Text style={s.h1}>{lostNote ? "Téléphone verrouillé" : "Téléphone en pause"}</Text>
         <Text style={s.sub}>
-          Tes parents ont mis ton téléphone en pause. Ça reviendra bientôt 💚
+          {lostNote ?? "Tes parents ont mis ton téléphone en pause. Ça reviendra bientôt 💚"}
         </Text>
         <TouchableOpacity style={s.sos} onPress={handleSos} activeOpacity={0.85}>
           <Text style={s.sosTxt}>SOS</Text>
@@ -478,6 +499,10 @@ function AppInner() {
           </TouchableOpacity>
         )}
       </View>
+
+      <TouchableOpacity onPress={handlePause} style={{ marginTop: 16 }}>
+        <Text style={s.usageLink}>⏸️ Demander une pause à mes parents</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => setShowShared(true)} style={{ marginTop: 14 }}>
         <Text style={s.usageLink}>ℹ️ Ce que je partage</Text>

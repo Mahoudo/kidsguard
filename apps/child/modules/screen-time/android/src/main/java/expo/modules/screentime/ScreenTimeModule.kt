@@ -7,9 +7,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.content.ContentUris
 import android.os.PowerManager
 import android.os.Process
+import android.provider.MediaStore
 import android.provider.Settings
+import android.telephony.TelephonyManager
+import androidx.exifinterface.media.ExifInterface
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.util.Calendar
@@ -138,6 +142,54 @@ class ScreenTimeModule : Module() {
         }
         ctx.startActivity(intent)
       }
+    }
+
+    // SIM identity (operator MCC+MNC + name). No permission required; null if no
+    // SIM. JS compares it across launches to detect a SIM swap (theft signal).
+    Function("getSimInfo") {
+      val ctx = appContext.reactContext ?: return@Function null
+      val tm = ctx.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+        ?: return@Function null
+      val op = tm.simOperator ?: ""
+      val name = tm.simOperatorName ?: ""
+      if (op.isBlank() && name.isBlank()) return@Function null
+      "$op|$name"
+    }
+
+    // On-device photo privacy scan: count recent images and how many carry a
+    // GPS tag. Reads ONLY EXIF metadata, never pixel content. Requires the
+    // media-read permission to have been granted by the JS side first.
+    AsyncFunction("scanPhotoPrivacy") {
+      val ctx = appContext.reactContext
+        ?: return@AsyncFunction mapOf("total" to 0, "geotagged" to 0)
+      val resolver = ctx.contentResolver
+      val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+      val projection = arrayOf(MediaStore.Images.Media._ID)
+      var total = 0
+      var geo = 0
+      try {
+        resolver.query(
+          uri, projection, null, null,
+          MediaStore.Images.Media.DATE_ADDED + " DESC"
+        )?.use { c ->
+          val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+          while (c.moveToNext() && total < 300) {
+            total++
+            val id = c.getLong(idCol)
+            val item = ContentUris.withAppendedId(uri, id)
+            try {
+              resolver.openInputStream(item)?.use { ins ->
+                if (ExifInterface(ins).latLong != null) geo++
+              }
+            } catch (e: Exception) {
+              // unreadable image — skip
+            }
+          }
+        }
+      } catch (e: Exception) {
+        // no permission / query failed — return zeros
+      }
+      mapOf("total" to total, "geotagged" to geo)
     }
 
     // Persist block rules for the accessibility service to enforce.

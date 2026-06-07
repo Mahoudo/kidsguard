@@ -25,11 +25,29 @@ export async function syncBlockRules(): Promise<void> {
   const childId = await getStoredChildId();
   if (!childId) return;
   try {
-    const [limitsRes, focusRes, childRes] = await Promise.all([
+    const [limitsRes, focusRes, childRes, pauseRes] = await Promise.all([
       supabase.from("app_limits").select("package,blocked").eq("child_id", childId),
       supabase.rpc("my_focus"),
       supabase.from("children").select("locked").eq("id", childId).maybeSingle(),
+      supabase.rpc("my_pause", { p_child: childId }),
     ]);
+
+    // An active, parent-granted pause suspends all enforcement.
+    const pausedUntil = pauseRes.data ? new Date(pauseRes.data as string).getTime() : 0;
+    if (pausedUntil > Date.now()) {
+      setBlockRules({
+        packages: [],
+        studyEnabled: false,
+        studyStart: null,
+        studyEnd: null,
+        sleepEnabled: false,
+        sleepStart: null,
+        sleepEnd: null,
+        locked: false,
+      });
+      return;
+    }
+
     const packages = (limitsRes.data ?? [])
       .filter((l: any) => l.blocked)
       .map((l: any) => l.package as string);

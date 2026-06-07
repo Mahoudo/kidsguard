@@ -13,6 +13,14 @@ export async function getLockState(): Promise<boolean> {
   return !!(data as any)?.locked;
 }
 
+/** The "lost mode" note set by the parent (shown on the lock screen), or null. */
+export async function getLostNote(): Promise<string | null> {
+  const childId = await getStoredChildId();
+  if (!childId) return null;
+  const { data } = await supabase.rpc("my_lost_note", { p_child: childId });
+  return (data as string | null) ?? null;
+}
+
 /** Live lock/unlock updates from the parent. */
 export function subscribeLock(
   childId: string,

@@ -22,3 +22,7 @@ android {
     targetSdkVersion rootProject.ext.has("targetSdkVersion") ? rootProject.ext.targetSdkVersion : 35
   }
 }
+
+dependencies {
+  implementation "androidx.exifinterface:exifinterface:1.3.7"
+}

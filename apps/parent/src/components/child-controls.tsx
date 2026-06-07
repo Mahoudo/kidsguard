@@ -10,10 +10,18 @@ import {
 import { useTheme, type Theme } from "../theme";
 import {
   getFocus,
+  giveSupervisionConsent,
   listAppLimits,
+  pendingPauses,
+  respondPause,
   setAppLimit,
+  setBirthYear,
   setFocus,
+  setLost,
+  supervisionStatus,
   type Focus,
+  type PauseRequest,
+  type SupervisionStatus,
   type UsageRow,
 } from "../../lib/api";
 
@@ -61,6 +69,10 @@ export function ChildControls({
   const [focus, setFoc] = useState<Focus>(EMPTY);
   const [blocked, setBlocked] = useState<Record<string, boolean>>({});
   const [names, setNames] = useState<Record<string, string>>({});
+  const [lost, setLostState] = useState(false);
+  const [pauses, setPauses] = useState<PauseRequest[]>([]);
+  const [sup, setSup] = useState<SupervisionStatus | null>(null);
+  const [year, setYear] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -75,8 +87,65 @@ export function ChildControls({
       });
       setBlocked(m);
       setNames(nm);
+      setSup(await supervisionStatus(childId).catch(() => null));
     })();
   }, [childId]);
+
+  // Poll pending pause requests for this child.
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const all = await pendingPauses().catch(() => []);
+      if (alive) setPauses(all.filter((p) => p.child_id === childId));
+    };
+    load();
+    const iv = setInterval(load, 10_000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, [childId]);
+
+  async function toggleLost(on: boolean) {
+    setLostState(on);
+    try {
+      await setLost(childId, on);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function answerPause(id: string, grant: boolean) {
+    try {
+      await respondPause(id, grant);
+      setPauses((p) => p.filter((x) => x.id !== id));
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function saveYear() {
+    const y = parseInt(year, 10);
+    if (!y || y < 1990 || y > 2025) {
+      Alert.alert("Année invalide", "Entre une année de naissance valide.");
+      return;
+    }
+    try {
+      await setBirthYear(childId, y);
+      setSup(await supervisionStatus(childId).catch(() => null));
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function consent() {
+    try {
+      await giveSupervisionConsent(childId);
+      setSup(await supervisionStatus(childId).catch(() => null));
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
 
   async function saveFocus(next: Focus) {
     setFoc(next);
@@ -171,6 +240,26 @@ export function ChildControls({
     <View style={s.card}>
       <Text style={s.title}>Contrôle & Focus</Text>
 
+      {pauses.length > 0 && (
+        <View style={s.pauseBox}>
+          {pauses.map((p) => (
+            <View key={p.id} style={s.pauseRow}>
+              <Text style={s.pauseTxt}>
+                ⏸️ Demande de pause · {p.minutes} min
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Text style={s.pauseYes} onPress={() => answerPause(p.id, true)}>
+                  Accepter
+                </Text>
+                <Text style={s.pauseNo} onPress={() => answerPause(p.id, false)}>
+                  Refuser
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       <FocusRow
         icon="📚"
         label="Mode Études"
@@ -212,6 +301,50 @@ export function ChildControls({
       <Text style={[s.muted, { marginTop: 8 }]}>
         Le blocage s'applique sur le téléphone de l'enfant (Android).
       </Text>
+
+      <View style={s.sep} />
+      <View style={s.focusRow}>
+        <Text style={s.focusLabel}>📵 Mode perdu (anti-vol)</Text>
+        <Switch
+          value={lost}
+          onValueChange={toggleLost}
+          trackColor={{ true: t.danger }}
+        />
+      </View>
+      <Text style={s.muted}>
+        Verrouille le téléphone et affiche un message « perdu ». Le SOS reste
+        accessible. Aucun micro/caméra activé.
+      </Text>
+
+      <View style={s.sep} />
+      <Text style={s.subtitle}>Consentement & âge (RGPD)</Text>
+      <View style={[s.focusRow, { paddingVertical: 4 }]}>
+        <Text style={s.muted}>Année de naissance</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <TextInput
+            style={s.time}
+            value={year}
+            onChangeText={setYear}
+            placeholder="2014"
+            placeholderTextColor={t.muted}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+          <Text style={s.pauseYes} onPress={saveYear}>
+            OK
+          </Text>
+        </View>
+      </View>
+      {sup && (
+        <Text style={s.muted}>
+          {sup.active
+            ? "✅ Supervision autorisée (2 tuteurs + mineur)"
+            : `Tuteurs ayant consenti : ${sup.consents}/2${sup.is_minor ? "" : " · âge non confirmé"}`}
+        </Text>
+      )}
+      <Text style={[s.pauseYes, { marginTop: 6 }]} onPress={consent}>
+        Je consens à la supervision
+      </Text>
     </View>
   );
 }
@@ -229,6 +362,22 @@ function makeStyles(t: Theme) {
     title: { fontSize: 15, fontWeight: "800", color: t.text, marginBottom: 10 },
     subtitle: { fontSize: 13, fontWeight: "700", color: t.text, marginBottom: 6 },
     muted: { color: t.muted, fontSize: 12 },
+    sep: { height: 1, backgroundColor: t.border, marginVertical: 12 },
+    pauseBox: {
+      backgroundColor: t.cardAlt,
+      borderRadius: 12,
+      padding: 10,
+      marginBottom: 10,
+    },
+    pauseRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 4,
+    },
+    pauseTxt: { color: t.text, fontSize: 13, fontWeight: "600", flex: 1 },
+    pauseYes: { color: t.primary, fontWeight: "800", fontSize: 13 },
+    pauseNo: { color: t.danger, fontWeight: "800", fontSize: 13 },
     focusRow: {
       flexDirection: "row",
       justifyContent: "space-between",

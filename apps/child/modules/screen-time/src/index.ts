@@ -100,6 +100,25 @@ export function requestDisableBatteryOptimization(): void {
   } catch {}
 }
 
+/** SIM identity "MCC+MNC|operatorName", or null if no SIM / unavailable. */
+export function getSimInfo(): string | null {
+  try {
+    return ScreenTime?.getSimInfo?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** On-device EXIF scan: { total, geotagged } photo counts (metadata only). */
+export async function scanPhotoPrivacy(): Promise<{ total: number; geotagged: number }> {
+  try {
+    if (!ScreenTime?.scanPhotoPrivacy) return { total: 0, geotagged: 0 };
+    return await ScreenTime.scanPhotoPrivacy();
+  } catch {
+    return { total: 0, geotagged: 0 };
+  }
+}
+
 /** Push the current block rules to the native service (SharedPreferences). */
 export function setBlockRules(r: BlockRules): void {
   try {

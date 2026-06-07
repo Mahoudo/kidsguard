@@ -20,6 +20,8 @@ import {
   fetchSos,
   fetchUsage,
   fetchUsageRange,
+  photoPrivacy,
+  type PhotoPrivacy,
   type CheckinEvent,
   type ChildWithLocation,
   type GeofenceEvent,
@@ -55,6 +57,7 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   const [period, setPeriod] = useState<"day" | "week">("day");
   const [places, setPlaces] = useState<PlaceOverview[]>([]);
   const [sel, setSel] = useState<TrackPoint | null>(null);
+  const [photo, setPhoto] = useState<PhotoPrivacy | null>(null);
   const mapRef = useRef<MapPanelHandle>(null);
 
   useEffect(() => {
@@ -86,6 +89,7 @@ export function ChildReport({ childId, childName, onClose }: Props) {
         setZonesCount(pl.length);
         setCheckins(ck.filter((c) => c.child_id === childId));
         setUsageWeek(uw);
+        setPhoto(await photoPrivacy(childId).catch(() => null));
       } finally {
         setLoading(false);
       }
@@ -309,6 +313,27 @@ export function ChildReport({ childId, childName, onClose }: Props) {
                   <Text style={st.usageDur}>{dur(u.total_ms)}</Text>
                 </View>
               ))
+            )}
+          </Section>
+
+          <Section title="Confidentialité des photos">
+            {!photo || photo.total == null ? (
+              <Text style={st.muted}>
+                Pas encore analysé (analyse à la volée sur le téléphone, métadonnées
+                uniquement — jamais le contenu).
+              </Text>
+            ) : (
+              <Text style={st.line}>
+                {photo.geotagged ?? 0} photo(s) géolocalisée(s) sur {photo.total}{" "}
+                analysée(s).
+                {"\n"}
+                <Text style={st.muted}>
+                  {(photo.geotagged ?? 0) > 0
+                    ? "⚠️ Des photos révèlent un lieu. Pense à désactiver la géolocalisation de l'appareil photo."
+                    : "✅ Aucune fuite de localisation détectée."}
+                  {photo.scanned_at ? ` · ${fmt(photo.scanned_at)}` : ""}
+                </Text>
+              </Text>
             )}
           </Section>
 

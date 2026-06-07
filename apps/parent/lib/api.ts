@@ -99,6 +99,80 @@ export async function setChildLock(childId: string, locked: boolean): Promise<vo
   if (error) throw error;
 }
 
+// ---- Lost mode (anti-theft) -----------------------------------------------
+export async function setLost(childId: string, on: boolean, note?: string): Promise<void> {
+  const { error } = await supabase.rpc("set_lost", {
+    p_child: childId,
+    p_on: on,
+    p_note: note ?? null,
+  });
+  if (error) throw error;
+}
+
+// ---- Pause requests --------------------------------------------------------
+export interface PauseRequest {
+  id: string;
+  child_id: string;
+  child_name: string;
+  minutes: number;
+  created_at: string;
+}
+
+export async function pendingPauses(): Promise<PauseRequest[]> {
+  const { data, error } = await supabase.rpc("pending_pauses");
+  if (error) throw error;
+  return (data ?? []) as PauseRequest[];
+}
+
+export async function respondPause(
+  requestId: string,
+  grant: boolean,
+  minutes?: number
+): Promise<void> {
+  const { error } = await supabase.rpc("respond_pause", {
+    p_request: requestId,
+    p_grant: grant,
+    p_minutes: minutes ?? null,
+  });
+  if (error) throw error;
+}
+
+// ---- Supervision consent (RGPD/COPPA) -------------------------------------
+export interface SupervisionStatus {
+  consents: number;
+  is_minor: boolean;
+  active: boolean;
+}
+
+export async function setBirthYear(childId: string, year: number): Promise<void> {
+  const { error } = await supabase.rpc("set_birth_year", { p_child: childId, p_year: year });
+  if (error) throw error;
+}
+
+export async function giveSupervisionConsent(childId: string): Promise<void> {
+  const { error } = await supabase.rpc("give_supervision_consent", { p_child: childId });
+  if (error) throw error;
+}
+
+export async function supervisionStatus(childId: string): Promise<SupervisionStatus | null> {
+  const { data, error } = await supabase.rpc("supervision_status", { p_child: childId });
+  if (error) throw error;
+  return ((data as any[])?.[0] ?? null) as SupervisionStatus | null;
+}
+
+// ---- Photo privacy (on-device EXIF, metadata only) -------------------------
+export interface PhotoPrivacy {
+  total: number | null;
+  geotagged: number | null;
+  scanned_at: string | null;
+}
+
+export async function photoPrivacy(childId: string): Promise<PhotoPrivacy | null> {
+  const { data, error } = await supabase.rpc("photo_privacy", { p_child: childId });
+  if (error) throw error;
+  return ((data as any[])?.[0] ?? null) as PhotoPrivacy | null;
+}
+
 /** Children + their latest known location (lng/lat decoded server-side). */
 export async function fetchChildren(): Promise<ChildWithLocation[]> {
   const { data, error } = await supabase.rpc("children_overview");
