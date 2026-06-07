@@ -32,11 +32,13 @@ class ScreenTimeModule : Module() {
 
     // Send the user to the system screen to grant usage access.
     Function("openUsageAccessSettings") {
-      val ctx = appContext.reactContext ?: return@Function
-      val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
       }
-      ctx.startActivity(intent)
     }
 
     // Per-app foreground time since local midnight.
@@ -86,11 +88,13 @@ class ScreenTimeModule : Module() {
 
     // Open the accessibility settings screen so the user can enable the blocker.
     Function("openAccessibilitySettings") {
-      val ctx = appContext.reactContext ?: return@Function
-      val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
       }
-      ctx.startActivity(intent)
     }
 
     // Is KidsGuard an active device admin? (blocks casual uninstall)
@@ -102,17 +106,19 @@ class ScreenTimeModule : Module() {
 
     // Prompt the user to grant device-admin (anti-uninstall protection).
     Function("requestAdmin") {
-      val ctx = appContext.reactContext ?: return@Function
-      val comp = ComponentName(ctx, KidsGuardAdminReceiver::class.java)
-      val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp)
-        putExtra(
-          DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-          "Active la protection KidsGuard pour empêcher la désinstallation."
-        )
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val comp = ComponentName(ctx, KidsGuardAdminReceiver::class.java)
+        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+          putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp)
+          putExtra(
+            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+            "Active la protection KidsGuard pour empêcher la désinstallation."
+          )
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
       }
-      ctx.startActivity(intent)
     }
 
     // Is the app exempt from battery optimization? (needed to stay alive in bg)
@@ -124,12 +130,14 @@ class ScreenTimeModule : Module() {
 
     // Prompt the user to exempt KidsGuard from battery optimization.
     Function("requestDisableBatteryOptimization") {
-      val ctx = appContext.reactContext ?: return@Function
-      val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-        data = Uri.parse("package:" + ctx.packageName)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+          data = Uri.parse("package:" + ctx.packageName)
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
       }
-      ctx.startActivity(intent)
     }
 
     // Persist block rules for the accessibility service to enforce.
@@ -138,17 +146,19 @@ class ScreenTimeModule : Module() {
       studyEnabled: Boolean, studyStart: String?, studyEnd: String?,
       sleepEnabled: Boolean, sleepStart: String?, sleepEnd: String?,
       locked: Boolean ->
-      val ctx = appContext.reactContext ?: return@Function
-      ctx.getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE).edit()
-        .putStringSet("blocked", packages.toSet())
-        .putBoolean("studyEnabled", studyEnabled)
-        .putString("studyStart", studyStart)
-        .putString("studyEnd", studyEnd)
-        .putBoolean("sleepEnabled", sleepEnabled)
-        .putString("sleepStart", sleepStart)
-        .putString("sleepEnd", sleepEnd)
-        .putBoolean("locked", locked)
-        .apply()
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        ctx.getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE).edit()
+          .putStringSet("blocked", packages.toSet())
+          .putBoolean("studyEnabled", studyEnabled)
+          .putString("studyStart", studyStart)
+          .putString("studyEnd", studyEnd)
+          .putBoolean("sleepEnabled", sleepEnabled)
+          .putString("sleepStart", sleepStart)
+          .putString("sleepEnd", sleepEnd)
+          .putBoolean("locked", locked)
+          .apply()
+      }
     }
   }
 }
