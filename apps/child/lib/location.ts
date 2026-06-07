@@ -3,12 +3,17 @@ import * as TaskManager from "expo-task-manager";
 import * as Battery from "expo-battery";
 import { supabase } from "./supabase";
 import { getStoredChildId } from "./pairing";
+import { syncBlockRules } from "./blocker";
 
 export const LOCATION_TASK = "kidsguard-location";
 
-// Background task: push every received location to the backend.
+// Background task: push every received location to the backend AND refresh the
+// block rules. The foreground service keeps this firing (~60s) even when the
+// child app is closed, so a parent's block/lock takes effect without the child
+// reopening the app.
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return;
+  syncBlockRules().catch(() => {}); // keep enforcement fresh in the background
   const { locations } = (data ?? {}) as { locations?: Location.LocationObject[] };
   const childId = await getStoredChildId();
   if (!childId || !locations?.length) return;
