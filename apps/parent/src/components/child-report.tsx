@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -23,6 +23,7 @@ import {
   type CheckinEvent,
   type ChildWithLocation,
   type GeofenceEvent,
+  type PlaceOverview,
   type SosEvent,
   type TrackPoint,
   type UsageDay,
@@ -31,6 +32,7 @@ import {
 import { computeSecurityScore } from "../../lib/score";
 import { generateSummary } from "../../lib/summary";
 import { ChildControls } from "./child-controls";
+import { MapPanel, type MapPanelHandle } from "./map-panel";
 
 interface Props {
   childId: string;
@@ -51,6 +53,9 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   const [checkins, setCheckins] = useState<CheckinEvent[]>([]);
   const [usageWeek, setUsageWeek] = useState<UsageDay[]>([]);
   const [period, setPeriod] = useState<"day" | "week">("day");
+  const [places, setPlaces] = useState<PlaceOverview[]>([]);
+  const [sel, setSel] = useState<TrackPoint | null>(null);
+  const mapRef = useRef<MapPanelHandle>(null);
 
   useEffect(() => {
     (async () => {
@@ -73,6 +78,8 @@ export function ChildReport({ childId, childName, onClose }: Props) {
         ]);
         setInfo(kids.find((k) => k.id === childId) ?? null);
         setTrack(t);
+        setPlaces(pl);
+        setSel(t[0] ?? null); // default-select the latest point
         setGeo(g.filter((e) => e.child_id === childId));
         setSos(s.filter((e) => e.child_id === childId));
         setUsage(u);
@@ -164,6 +171,39 @@ export function ChildReport({ childId, childName, onClose }: Props) {
       {children}
     </View>
   );
+
+  // Click a history row -> select it and fly the map to that point.
+  const selectPoint = (p: TrackPoint) => {
+    setSel(p);
+    mapRef.current?.centerOn([p.lng, p.lat], 16);
+  };
+
+  // Group the track by calendar day (newest first; track is already desc).
+  const trackByDay: { day: string; points: TrackPoint[] }[] = [];
+  {
+    const byDay = new Map<string, TrackPoint[]>();
+    for (const p of track) {
+      const key = new Date(p.recorded_at).toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+      });
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key)!.push(p);
+    }
+    for (const [day, points] of byDay) trackByDay.push({ day, points });
+  }
+
+  // The map shows a single marker at the selected point (default: latest).
+  const mapPt =
+    sel ??
+    (info?.lat != null
+      ? ({ recorded_at: info.located_at ?? "", lng: info.lng!, lat: info.lat } as TrackPoint)
+      : null);
+  const mapLocated: ChildWithLocation[] = mapPt
+    ? [{ ...(info ?? {}), id: childId, name: childName, lng: mapPt.lng, lat: mapPt.lat } as ChildWithLocation]
+    : [];
+  const mapCenter: [number, number] = mapPt ? [mapPt.lng, mapPt.lat] : [-3.9039, 5.3747];
 
   return (
     <SafeAreaView style={st.overlay} edges={["top", "bottom"]}>
@@ -302,11 +342,52 @@ export function ChildReport({ childId, childName, onClose }: Props) {
             {track.length === 0 ? (
               <Text style={st.muted}>Aucun point.</Text>
             ) : (
-              track.slice(0, 30).map((p, i) => (
-                <Text key={i} style={st.lineSmall}>
-                  {fmt(p.recorded_at)} — {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
-                </Text>
-              ))
+              <>
+                <View style={st.mapBox}>
+                  <MapPanel
+                    ref={mapRef}
+                    located={mapLocated}
+                    places={places}
+                    center={mapCenter}
+                  />
+                </View>
+                {sel && (
+                  <Text style={st.mapHint}>
+                    📍 {sel.lat.toFixed(5)}, {sel.lng.toFixed(5)} · {fmt(sel.recorded_at)}
+                  </Text>
+                )}
+                {trackByDay.map((grp) => (
+                  <View key={grp.day} style={{ marginTop: 10 }}>
+                    <Text style={st.dayHeader}>{grp.day}</Text>
+                    {grp.points.map((p, i) => {
+                      const active =
+                        sel?.recorded_at === p.recorded_at &&
+                        sel?.lat === p.lat &&
+                        sel?.lng === p.lng;
+                      return (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() => selectPoint(p)}
+                          style={[st.histRow, active && st.histRowActive]}
+                        >
+                          <Text
+                            style={[
+                              st.lineSmall,
+                              active && { color: th.primary, fontWeight: "700" },
+                            ]}
+                          >
+                            {new Date(p.recorded_at).toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}{" "}
+                            — {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))}
+              </>
             )}
           </Section>
         </ScrollView>
@@ -399,6 +480,24 @@ function makeStyles(t: Theme) {
     line: { fontSize: 14, color: t.text, lineHeight: 22 },
     lineSmall: { fontSize: 12, color: t.muted, lineHeight: 20 },
     muted: { color: t.muted, fontSize: 12 },
+    mapBox: {
+      height: 320,
+      borderRadius: 14,
+      overflow: "hidden",
+      marginBottom: 6,
+      backgroundColor: t.cardAlt,
+    },
+    mapHint: { fontSize: 12, color: t.text, fontWeight: "600", marginBottom: 4 },
+    dayHeader: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: t.text,
+      textTransform: "capitalize",
+      marginBottom: 2,
+      marginTop: 4,
+    },
+    histRow: { paddingVertical: 5, paddingHorizontal: 8, borderRadius: 8 },
+    histRowActive: { backgroundColor: t.cardAlt },
     usageRow: {
       flexDirection: "row",
       justifyContent: "space-between",
