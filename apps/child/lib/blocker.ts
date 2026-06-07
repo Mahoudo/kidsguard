@@ -7,6 +7,7 @@ import {
   requestAdmin,
   isBatteryUnrestricted,
   requestDisableBatteryOptimization,
+  lockNow,
   setBlockRules,
 } from "../modules/screen-time";
 
@@ -17,6 +18,7 @@ export {
   requestAdmin,
   isBatteryUnrestricted,
   requestDisableBatteryOptimization,
+  lockNow,
 };
 
 /** Fetch blocked apps + focus windows + lock state, push them to the native
@@ -52,6 +54,7 @@ export async function syncBlockRules(): Promise<void> {
       .filter((l: any) => l.blocked)
       .map((l: any) => l.package as string);
     const f: any = (focusRes.data as any[])?.[0] ?? {};
+    const isLocked = !!(childRes.data as any)?.locked;
     setBlockRules({
       packages,
       studyEnabled: !!f.study_enabled,
@@ -60,8 +63,10 @@ export async function syncBlockRules(): Promise<void> {
       sleepEnabled: !!f.sleep_enabled,
       sleepStart: f.sleep_start ?? null,
       sleepEnd: f.sleep_end ?? null,
-      locked: !!(childRes.data as any)?.locked,
+      locked: isLocked,
     });
+    // Real screen lock when the parent locked the device (needs device admin).
+    if (isLocked) lockNow();
   } catch (e: any) {
     console.warn("syncBlockRules failed", e?.message);
   }

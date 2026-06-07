@@ -1,6 +1,8 @@
 package expo.modules.screentime
 
 import android.accessibilityservice.AccessibilityService
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
@@ -42,13 +44,28 @@ class AppBlockerService : AccessibilityService() {
     // sees the lock message. For focus windows or a single blocked app, a
     // gentler bounce to the home screen is enough.
     if (locked) {
-      launchKidsGuard()
+      // Real device lock (PIN) if admin is active; otherwise fall back to
+      // bringing KidsGuard (with its lock message) to the front.
+      if (!lockDevice()) launchKidsGuard()
     } else if (inFocusWindow(prefs) || blocked.contains(pkg)) {
       performGlobalAction(GLOBAL_ACTION_HOME)
     }
   }
 
   override fun onInterrupt() {}
+
+  private fun lockDevice(): Boolean {
+    return try {
+      val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+      val comp = ComponentName(this, KidsGuardAdminReceiver::class.java)
+      if (dpm.isAdminActive(comp)) {
+        dpm.lockNow()
+        true
+      } else false
+    } catch (e: Exception) {
+      false
+    }
+  }
 
   private fun launchKidsGuard() {
     try {

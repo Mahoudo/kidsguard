@@ -100,6 +100,13 @@ export function requestDisableBatteryOptimization(): void {
   } catch {}
 }
 
+/** Lock the device screen now (real lock, needs PIN). No-op if admin inactive. */
+export function lockNow(): void {
+  try {
+    ScreenTime?.lockNow?.();
+  } catch {}
+}
+
 /** SIM identity "MCC+MNC|operatorName", or null if no SIM / unavailable. */
 export function getSimInfo(): string | null {
   try {

@@ -144,6 +144,19 @@ class ScreenTimeModule : Module() {
       }
     }
 
+    // Lock the device screen right now (real lock — needs PIN to unlock).
+    // Requires the device-admin (force-lock policy) to be active.
+    Function("lockNow") {
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val dpm = ctx.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val comp = ComponentName(ctx, KidsGuardAdminReceiver::class.java)
+        if (dpm.isAdminActive(comp)) {
+          try { dpm.lockNow() } catch (e: Exception) {}
+        }
+      }
+    }
+
     // SIM identity (operator MCC+MNC + name). No permission required; null if no
     // SIM. JS compares it across launches to detect a SIM swap (theft signal).
     Function("getSimInfo") {
