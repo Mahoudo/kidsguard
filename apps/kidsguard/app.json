@@ -1,0 +1,80 @@
+{
+  "expo": {
+    "name": "KidsGuard",
+    "slug": "kidsguard-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "kidsguard",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.kidsguard.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "KidsGuard partage la position avec les parents.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "KidsGuard partage la position avec les parents, même en arrière-plan.",
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "package": "com.kidsguard.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "android.permission.PACKAGE_USAGE_STATS"
+      ]
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#208AEF",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 76
+          }
+        }
+      ],
+      "@maplibre/maplibre-react-native",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "KidsGuard partage la position avec les parents, même en arrière-plan.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-audio"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8769d831-4db3-44b9-bf41-f5700de1fa01"
+      }
+    },
+    "owner": "mahoudo"
+  }
+}

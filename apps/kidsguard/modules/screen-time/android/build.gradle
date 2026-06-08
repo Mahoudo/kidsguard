@@ -1,0 +1,28 @@
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+group = 'expo.modules.screentime'
+version = '0.1.0'
+
+def expoModulesCorePlugin = new File(
+  project(":expo-modules-core").projectDir.absolutePath,
+  "ExpoModulesCorePlugin.gradle"
+)
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+
+android {
+  namespace "expo.modules.screentime"
+  compileSdkVersion rootProject.ext.has("compileSdkVersion") ? rootProject.ext.compileSdkVersion : 35
+
+  defaultConfig {
+    minSdkVersion rootProject.ext.has("minSdkVersion") ? rootProject.ext.minSdkVersion : 24
+    targetSdkVersion rootProject.ext.has("targetSdkVersion") ? rootProject.ext.targetSdkVersion : 35
+  }
+}
+
+dependencies {
+  implementation "androidx.exifinterface:exifinterface:1.3.7"
+}
