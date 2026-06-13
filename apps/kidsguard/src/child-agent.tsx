@@ -28,6 +28,7 @@ import { sendCheckin, type Mood } from "../lib-child/checkin";
 import { cacheEmergencyPhone } from "../lib-child/emergency";
 import { getLockState, getLostNote, subscribeLock } from "../lib-child/lock";
 import { reportSim } from "../lib-child/antitheft";
+import { registerChildPush, listenChildPush } from "../lib-child/childPush";
 import { requestPause } from "../lib-child/pause";
 import { scanAndReportPhotos } from "../lib-child/photo";
 import {
@@ -156,6 +157,7 @@ function AppInner() {
         setTracking(await isTracking());
         cacheEmergencyPhone(); // cache for offline SOS-by-SMS
         reportSim(); // alert the parent if the SIM was swapped
+        registerChildPush(); // wake-on-push for instant remote enforcement
         scanAndReportPhotos(); // on-device EXIF privacy check (metadata only)
       }
       setLoading(false);
@@ -193,10 +195,12 @@ function AppInner() {
       } catch {}
       syncBlockRules();
     }, 30_000);
+    const unsubPush = listenChildPush();
     return () => {
       stopCommandListener();
       unsubLock();
       clearInterval(blockIv);
+      unsubPush();
     };
   }, [childId]);
 
