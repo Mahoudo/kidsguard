@@ -4,6 +4,7 @@ import * as Battery from "expo-battery";
 import { supabase } from "./supabase";
 import { getStoredChildId } from "./pairing";
 import { syncBlockRules } from "./blocker";
+import { rpcOrQueue, flushQueue } from "./offlineQueue";
 
 export const LOCATION_TASK = "kidsguard-location";
 
@@ -14,6 +15,7 @@ export const LOCATION_TASK = "kidsguard-location";
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return;
   syncBlockRules().catch(() => {}); // keep enforcement fresh in the background
+  flushQueue().catch(() => {}); // resend positions buffered during an outage
   const { locations } = (data ?? {}) as { locations?: Location.LocationObject[] };
   const childId = await getStoredChildId();
   if (!childId || !locations?.length) return;
@@ -22,7 +24,8 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   const battery = level >= 0 ? Math.round(level * 100) : null;
 
   for (const loc of locations) {
-    const { error: rpcError } = await supabase.rpc("ingest_location", {
+    // rpcOrQueue keeps the point if offline, so the track isn't lost in dead zones.
+    await rpcOrQueue("ingest_location", {
       p_child: childId,
       p_lng: loc.coords.longitude,
       p_lat: loc.coords.latitude,
@@ -31,7 +34,6 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
       p_is_moving: (loc.coords.speed ?? 0) > 0.5,
       p_recorded_at: new Date(loc.timestamp).toISOString(),
     });
-    if (rpcError) console.warn("ingest_location failed", rpcError.message);
   }
 });
 
@@ -45,7 +47,8 @@ export async function sendCurrentPosition(): Promise<void> {
     });
     const level = await Battery.getBatteryLevelAsync();
     const battery = level >= 0 ? Math.round(level * 100) : null;
-    const { error } = await supabase.rpc("ingest_location", {
+    await flushQueue().catch(() => {});
+    await rpcOrQueue("ingest_location", {
       p_child: childId,
       p_lng: pos.coords.longitude,
       p_lat: pos.coords.latitude,
@@ -54,7 +57,6 @@ export async function sendCurrentPosition(): Promise<void> {
       p_is_moving: false,
       p_recorded_at: new Date(pos.timestamp).toISOString(),
     });
-    if (error) console.warn("sendCurrentPosition ingest failed", error.message);
   } catch (e: any) {
     console.warn("sendCurrentPosition failed", e?.message);
   }
