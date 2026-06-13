@@ -26,6 +26,7 @@ import {
   getEmergencyPhone,
   listCircle,
   redeemGuardianInvite,
+  regeneratePairingCode,
   removeCircleMember,
   type CircleMember,
   setChildLock,
@@ -223,7 +224,28 @@ function Dashboard() {
       return;
     }
     lastTap.current = { id: item.id, t: now };
-    if (item.lat != null && item.lng != null) {
+    if (item.pairing_code) {
+      // Not paired yet: show / regenerate the pairing code.
+      Alert.alert(
+        item.name,
+        `Code d'association (valide 30 min) :\n\n${item.pairing_code}`,
+        [
+          { text: "OK" },
+          {
+            text: "↻ Nouveau code",
+            onPress: async () => {
+              try {
+                const c = await regeneratePairingCode(item.id);
+                await refresh();
+                Alert.alert("Nouveau code", `Saisis-le dans l'app de ${item.name} :\n\n${c}`);
+              } catch (e: any) {
+                Alert.alert("Erreur", e.message);
+              }
+            },
+          },
+        ]
+      );
+    } else if (item.lat != null && item.lng != null) {
       mapRef.current?.centerOn([item.lng, item.lat], 16);
     } else {
       Alert.alert(item.name, "Pas encore de position.");

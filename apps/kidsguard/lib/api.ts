@@ -49,6 +49,13 @@ export async function getEmergencyPhone(): Promise<string | null> {
   return (data as string) ?? null;
 }
 
+/** Generate a fresh 30-min pairing code for an existing child. */
+export async function regeneratePairingCode(childId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("regenerate_pairing_code", { p_child: childId });
+  if (error) throw error;
+  return data as string;
+}
+
 // ---- Trust circle (community SOS contacts) --------------------------------
 export interface CircleMember {
   id: string;

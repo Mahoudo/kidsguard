@@ -379,14 +379,15 @@ function AppInner() {
         <StatusBar style="dark" />
         <Mascot face="🦁" />
         <Text style={s.h1}>On se connecte&nbsp;?</Text>
-        <Text style={s.sub}>Tape le code à 6 chiffres de tes parents 👇</Text>
+        <Text style={s.sub}>Tape le code de tes parents 👇</Text>
         <TextInput
           style={s.code}
           value={code}
-          onChangeText={setCode}
-          keyboardType="number-pad"
-          maxLength={6}
-          placeholder="• • • • • •"
+          onChangeText={(t) => setCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          maxLength={8}
+          placeholder="A B C 1 2 3"
           placeholderTextColor="#CFC8E0"
           textAlign="center"
         />
