@@ -399,7 +399,7 @@ function AppInner() {
           label={busy ? "…" : "Connecter"}
           color={C.violet}
           onPress={handlePair}
-          disabled={busy || code.length !== 6}
+          disabled={busy || code.trim().length < 6}
         />
       </ScrollView>
     );
