@@ -19,11 +19,15 @@ import { registerForPush, presentSosAlert, presentLocalAlert } from "../../lib/p
 import { supabase } from "../../lib/supabase";
 import { useTheme, type Theme } from "../theme";
 import {
+  addCircleMember,
   createChild,
   createGuardianInvite,
   createPlace,
   getEmergencyPhone,
+  listCircle,
   redeemGuardianInvite,
+  removeCircleMember,
+  type CircleMember,
   setChildLock,
   setEmergencyPhone,
   startCall,
@@ -151,6 +155,10 @@ function Dashboard() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [emPhone, setEmPhone] = useState<string | null>(null);
+  const [circle, setCircle] = useState<CircleMember[]>([]);
+  const [circleOpen, setCircleOpen] = useState(false);
+  const [cName, setCName] = useState("");
+  const [cPhone, setCPhone] = useState("");
   const [editPhone, setEditPhone] = useState(false);
   const [phoneVal, setPhoneVal] = useState("");
   const [joinOpen, setJoinOpen] = useState(false);
@@ -232,6 +240,7 @@ function Dashboard() {
       setChildren(ch);
       setPlaces(pl);
       setEmPhone(ph);
+      setCircle(await listCircle().catch(() => []));
       // One-time low-battery alert when a child crosses below 20%.
       for (const k of ch) {
         const b = k.last_battery_pct;
@@ -253,6 +262,27 @@ function Dashboard() {
       await setEmergencyPhone(phoneVal.trim());
       setEmPhone(phoneVal.trim() || null);
       setEditPhone(false);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function addCircle() {
+    if (!cName.trim() || !cPhone.trim()) return;
+    try {
+      await addCircleMember(cName.trim(), cPhone.trim());
+      setCName("");
+      setCPhone("");
+      setCircle(await listCircle());
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function delCircle(id: string) {
+    try {
+      await removeCircleMember(id);
+      setCircle((c) => c.filter((m) => m.id !== id));
     } catch (e: any) {
       Alert.alert("Erreur", e.message ?? String(e));
     }
@@ -531,6 +561,51 @@ function Dashboard() {
             <TouchableOpacity style={s.btnSm} onPress={savePhone}>
               <Text style={s.btnText}>OK</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        <TouchableOpacity onPress={() => setCircleOpen((v) => !v)} style={{ marginTop: 12 }}>
+          <Text style={[s.muted, { textAlign: "center" }]}>
+            🤝 Cercle de confiance (SOS) : {circle.length} {circleOpen ? "▲" : "▼"}
+          </Text>
+        </TouchableOpacity>
+        {circleOpen && (
+          <View style={{ marginTop: 8 }}>
+            {circle.map((m) => (
+              <View key={m.id} style={[s.addRow, { marginBottom: 6 }]}>
+                <Text style={{ flex: 1, color: t.text }}>
+                  {m.name} · {m.phone}
+                </Text>
+                <TouchableOpacity onPress={() => delCircle(m.id)}>
+                  <Text style={{ color: t.danger, fontWeight: "700", fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <View style={[s.addRow, { marginTop: 4 }]}>
+              <TextInput
+                style={[s.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="Nom (ex: Voisin, Oncle)"
+                placeholderTextColor={t.muted}
+                value={cName}
+                onChangeText={setCName}
+              />
+            </View>
+            <View style={[s.addRow, { marginTop: 6 }]}>
+              <TextInput
+                style={[s.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="+225 07 00 00 00 00"
+                placeholderTextColor={t.muted}
+                keyboardType="phone-pad"
+                value={cPhone}
+                onChangeText={setCPhone}
+              />
+              <TouchableOpacity style={s.btnSm} onPress={addCircle}>
+                <Text style={s.btnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[s.muted, { fontSize: 11, marginTop: 6, textAlign: "center" }]}>
+              Ces contacts reçoivent un SMS d'urgence quand l'enfant déclenche le SOS.
+            </Text>
           </View>
         )}
 

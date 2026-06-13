@@ -4,18 +4,28 @@ import * as SMS from "expo-sms";
 import { supabase } from "./supabase";
 import { getEmergencyPhone } from "./emergency";
 
-/** Offline fallback: open an SMS to the cached emergency number with a map link.
+/** Open an SOS SMS (with a map link) to the emergency number AND the whole
+ *  trust circle (neighbours, family...). Works offline, no data needed.
  *  Returns true if the SMS composer was opened. */
-export async function sendSosSms(): Promise<boolean> {
-  const phone = await getEmergencyPhone();
-  if (!phone) return false;
+export async function sendSosSms(childId?: string): Promise<boolean> {
   if (!(await SMS.isAvailableAsync())) return false;
+
+  const recipients = new Set<string>();
+  const emergency = await getEmergencyPhone();
+  if (emergency) recipients.add(emergency);
+
+  if (childId) {
+    const { data } = await supabase.rpc("my_circle_phones", { p_child: childId });
+    (data as any[] | null)?.forEach((c) => c?.phone && recipients.add(c.phone));
+  }
+  if (recipients.size === 0) return false;
+
   const pos = await Location.getLastKnownPositionAsync().catch(() => null);
   const link = pos
     ? `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`
     : "";
   const msg = `🆘 SOS ! J'ai besoin d'aide.${link ? " Ma position : " + link : ""}`;
-  await SMS.sendSMSAsync([phone], msg);
+  await SMS.sendSMSAsync([...recipients], msg);
   return true;
 }
 

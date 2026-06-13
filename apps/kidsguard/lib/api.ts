@@ -49,6 +49,35 @@ export async function getEmergencyPhone(): Promise<string | null> {
   return (data as string) ?? null;
 }
 
+// ---- Trust circle (community SOS contacts) --------------------------------
+export interface CircleMember {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export async function listCircle(): Promise<CircleMember[]> {
+  const familyId = await ensureFamily();
+  const { data, error } = await supabase.rpc("list_circle", { p_family: familyId });
+  if (error) throw error;
+  return (data ?? []) as CircleMember[];
+}
+
+export async function addCircleMember(name: string, phone: string): Promise<void> {
+  const familyId = await ensureFamily();
+  const { error } = await supabase.rpc("add_circle_member", {
+    p_family: familyId,
+    p_name: name,
+    p_phone: phone,
+  });
+  if (error) throw error;
+}
+
+export async function removeCircleMember(id: string): Promise<void> {
+  const { error } = await supabase.rpc("remove_circle_member", { p_id: id });
+  if (error) throw error;
+}
+
 /** Multi-guardian: invite another adult to follow this family. */
 export async function createGuardianInvite(): Promise<string> {
   const familyId = await ensureFamily();

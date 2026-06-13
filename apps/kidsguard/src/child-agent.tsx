@@ -303,17 +303,25 @@ function AppInner() {
 
   async function handleSos() {
     if (!childId) return;
+    let online = false;
     try {
-      await raiseSos(childId);
-      Alert.alert("SOS envoyé ✅", "Tes parents sont prévenus, ne bouge pas.");
-    } catch (e: any) {
-      // No data connection? Fall back to an emergency SMS.
-      const sent = await sendSosSms().catch(() => false);
-      if (sent) {
-        Alert.alert("SOS par SMS 📩", "Pas d'internet — envoie le SMS d'urgence (déjà prêt).");
-      } else {
-        Alert.alert("Erreur", e.message ?? String(e));
-      }
+      await raiseSos(childId); // server -> parents pushed
+      online = true;
+    } catch {}
+    // Always also alert the trust circle by SMS (neighbours, family) — works
+    // offline and reaches people who don't have the app.
+    const smsReady = await sendSosSms(childId).catch(() => false);
+    if (online) {
+      Alert.alert(
+        "SOS envoyé ✅",
+        smsReady
+          ? "Tes parents sont prévenus. Envoie aussi le SMS au cercle (déjà prêt)."
+          : "Tes parents sont prévenus, ne bouge pas."
+      );
+    } else if (smsReady) {
+      Alert.alert("SOS par SMS 📩", "Pas d'internet — envoie le SMS (cercle + urgence, déjà prêt).");
+    } else {
+      Alert.alert("Erreur", "SOS impossible. Réessaie ou appelle directement.");
     }
   }
 
