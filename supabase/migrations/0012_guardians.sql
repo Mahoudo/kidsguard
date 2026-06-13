@@ -1,4 +1,8 @@
 -- ============================================================================
+-- OBSOLETE: superseded by 0022_guardians_safe.sql (owner-OR-member access +
+-- owner backfill). Kept only for migration-history ordering; 0022 redefines
+-- the same objects safely afterward.
+-- ============================================================================
 -- KidsGuard — multi-tuteurs (multiple guardians per family).
 -- Extended families (UEMOA): several adults can follow the same children.
 -- ============================================================================

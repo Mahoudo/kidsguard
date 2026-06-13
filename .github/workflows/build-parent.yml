@@ -1,11 +1,8 @@
 name: Build Parent APK
 
+# Backup app (superseded by the unified apps/kidsguard). Manual trigger only.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "apps/parent/**"
-      - ".github/workflows/build-parent.yml"
 
 jobs:
   build:

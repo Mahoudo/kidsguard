@@ -18,6 +18,9 @@ $$;
 alter publication supabase_realtime add table public.children;
 
 -- Expose lock state to the parent dashboard.
+-- drop first: this changes the return type (adds `locked`), which
+-- `create or replace` cannot do over the earlier definition.
+drop function if exists children_overview();
 create or replace function children_overview()
 returns table (
   id uuid, name text, avatar_url text, pairing_code text,
