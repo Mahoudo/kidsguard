@@ -291,6 +291,18 @@ export async function setFocus(childId: string, f: Focus): Promise<void> {
   if (error) throw error;
 }
 
+// ---- Auto school mode -------------------------------------------------------
+export async function getAutoSchool(childId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("get_auto_school", { p_child: childId });
+  if (error) throw error;
+  return !!data;
+}
+
+export async function setAutoSchool(childId: string, on: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_auto_school", { p_child: childId, p_on: on });
+  if (error) throw error;
+}
+
 export interface AppLimit {
   package: string;
   app_name: string;

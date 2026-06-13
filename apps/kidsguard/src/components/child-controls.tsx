@@ -9,9 +9,11 @@ import {
 } from "react-native";
 import { useTheme, type Theme } from "../theme";
 import {
+  getAutoSchool,
   getFocus,
   giveSupervisionConsent,
   listAppLimits,
+  setAutoSchool,
   pendingPauses,
   respondPause,
   setAppLimit,
@@ -73,6 +75,7 @@ export function ChildControls({
   const [pauses, setPauses] = useState<PauseRequest[]>([]);
   const [sup, setSup] = useState<SupervisionStatus | null>(null);
   const [year, setYear] = useState("");
+  const [autoSchool, setAutoSch] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -88,8 +91,18 @@ export function ChildControls({
       setBlocked(m);
       setNames(nm);
       setSup(await supervisionStatus(childId).catch(() => null));
+      setAutoSch(await getAutoSchool(childId).catch(() => false));
     })();
   }, [childId]);
+
+  async function toggleAutoSchool(on: boolean) {
+    setAutoSch(on);
+    try {
+      await setAutoSchool(childId, on);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
 
   // Poll pending pause requests for this child.
   useEffect(() => {
@@ -280,6 +293,14 @@ export function ChildControls({
         onStart={(v) => saveFocus({ ...focus, sleep_start: v })}
         onEnd={(v) => saveFocus({ ...focus, sleep_end: v })}
       />
+
+      <View style={s.focusRow}>
+        <Text style={s.focusLabel}>🏫 Mode école auto</Text>
+        <Switch value={autoSchool} onValueChange={toggleAutoSchool} trackColor={{ true: t.primary }} />
+      </View>
+      <Text style={s.muted}>
+        Active le blocage automatiquement quand l'enfant entre dans une zone « école ».
+      </Text>
 
       <Text style={[s.subtitle, { marginTop: 12 }]}>Bloquer des applis</Text>
       {apps.length === 0 ? (

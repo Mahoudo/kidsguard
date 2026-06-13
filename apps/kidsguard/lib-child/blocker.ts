@@ -30,7 +30,7 @@ export async function syncBlockRules(): Promise<void> {
     const [limitsRes, focusRes, childRes, pauseRes] = await Promise.all([
       supabase.from("app_limits").select("package,blocked").eq("child_id", childId),
       supabase.rpc("my_focus"),
-      supabase.from("children").select("locked").eq("id", childId).maybeSingle(),
+      supabase.from("children").select("locked,at_school").eq("id", childId).maybeSingle(),
       supabase.rpc("my_pause", { p_child: childId }),
     ]);
 
@@ -55,11 +55,13 @@ export async function syncBlockRules(): Promise<void> {
       .map((l: any) => l.package as string);
     const f: any = (focusRes.data as any[])?.[0] ?? {};
     const isLocked = !!(childRes.data as any)?.locked;
+    // Auto school mode: while inside a school zone, Études is on all day.
+    const atSchool = !!(childRes.data as any)?.at_school;
     setBlockRules({
       packages,
-      studyEnabled: !!f.study_enabled,
-      studyStart: f.study_start ?? null,
-      studyEnd: f.study_end ?? null,
+      studyEnabled: atSchool || !!f.study_enabled,
+      studyStart: atSchool ? "00:00" : f.study_start ?? null,
+      studyEnd: atSchool ? "23:59" : f.study_end ?? null,
       sleepEnabled: !!f.sleep_enabled,
       sleepStart: f.sleep_start ?? null,
       sleepEnd: f.sleep_end ?? null,
