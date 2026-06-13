@@ -3,7 +3,7 @@
 ## 0. La clé de signature (À NE JAMAIS PERDRE)
 
 Fichier : `Downloads/kidsguard-upload.keystore`
-Mot de passe (store + key) : `KidsGuardUpload2026`
+Mot de passe (store + key) : **garde-le dans un gestionnaire de mots de passe — ne l'écris jamais ici** (il est stocké en secret GitHub `ANDROID_KEYSTORE_PASSWORD`).
 Alias : `kidsguard`
 
 > ⚠️ **Sauvegarde ce fichier + ce mot de passe** (cloud privé, gestionnaire de mots de passe).
