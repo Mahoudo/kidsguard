@@ -27,9 +27,12 @@ export const LocationPing = Coord.extend({
 export type LocationPing = z.infer<typeof LocationPing>;
 
 // ---- Pairing ----------------------------------------------------------------
+// Accepts legacy 6-digit codes and new 8-char unambiguous alphanumeric codes.
 export const PairingCode = z
   .string()
-  .regex(/^\d{6}$/, "Le code doit faire 6 chiffres");
+  .trim()
+  .transform((s) => s.toUpperCase())
+  .pipe(z.string().regex(/^[A-Z0-9]{6,8}$/, "Code invalide"));
 export type PairingCode = z.infer<typeof PairingCode>;
 
 // ---- Place (geofence) -------------------------------------------------------

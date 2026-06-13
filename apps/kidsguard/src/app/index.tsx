@@ -548,12 +548,13 @@ function Dashboard() {
           <View style={[s.addRow, { marginTop: 8 }]}>
             <TextInput
               style={[s.input, { flex: 1, marginBottom: 0 }]}
-              placeholder="Code tuteur (6 chiffres)"
+              placeholder="Code tuteur"
               placeholderTextColor={t.muted}
-              keyboardType="number-pad"
-              maxLength={6}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={8}
               value={joinCode}
-              onChangeText={setJoinCode}
+              onChangeText={(x) => setJoinCode(x.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
             />
             <TouchableOpacity style={s.btnSm} onPress={joinFamily}>
               <Text style={s.btnText}>OK</Text>
