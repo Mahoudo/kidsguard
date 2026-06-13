@@ -63,13 +63,13 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
         height: "22px",
         borderRadius: "50%",
         background: "rgba(107,78,230,0.25)",
-        border: "2px solid #6B4EE6",
+        border: "2px solid #5B4BE3",
       });
       markers.current.push(new maplibregl.Marker({ element: d }).setLngLat([p.lng, p.lat]).addTo(m));
     }
     for (const c of located) {
       markers.current.push(
-        new maplibregl.Marker({ color: "#6B4EE6" }).setLngLat([c.lng!, c.lat!]).addTo(m)
+        new maplibregl.Marker({ color: "#5B4BE3" }).setLngLat([c.lng!, c.lat!]).addTo(m)
       );
     }
   }, [located, places]);

@@ -13,7 +13,7 @@ export function RoleChooser({
       <Text style={s.sub}>Qui utilise cet appareil ?</Text>
 
       <TouchableOpacity
-        style={[s.btn, { backgroundColor: "#6B4EE6" }]}
+        style={[s.btn, { backgroundColor: "#5B4BE3" }]}
         onPress={() => onChoose("parent")}
         activeOpacity={0.85}
       >
@@ -22,7 +22,7 @@ export function RoleChooser({
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[s.btn, { backgroundColor: "#FF7A59" }]}
+        style={[s.btn, { backgroundColor: "#FF5D6C" }]}
         onPress={() => onChoose("child")}
         activeOpacity={0.85}
       >
@@ -36,7 +36,7 @@ export function RoleChooser({
 }
 
 const s = StyleSheet.create({
-  c: { flex: 1, backgroundColor: "#FFF6EC", alignItems: "center", justifyContent: "center", padding: 28 },
+  c: { flex: 1, backgroundColor: "#FFF6F0", alignItems: "center", justifyContent: "center", padding: 28 },
   logo: { fontSize: 64 },
   title: { fontSize: 30, fontWeight: "900", color: "#1f2440", marginTop: 6 },
   sub: { fontSize: 15, color: "#6b7280", marginTop: 8, marginBottom: 28 },

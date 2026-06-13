@@ -17,20 +17,21 @@ export interface Theme {
   onPrimary: string;
 }
 
+// Direction "Indigo Soft" — premium, warm, family-friendly.
 const light: Theme = {
   dark: false,
-  bg: "#F5F6FB",
+  bg: "#F1F1FB",
   card: "#FFFFFF",
-  cardAlt: "#F0F1F8",
-  text: "#15162B",
-  muted: "#8A8FA3",
-  border: "#ECEDF5",
-  primary: "#6C5CE7",
-  primarySoft: "#EEEBFF",
-  accent: "#4A6CF7",
-  danger: "#FF4D6D",
-  success: "#21C97A",
-  warning: "#FFA726",
+  cardAlt: "#F5F4FF",
+  text: "#16132E",
+  muted: "#7C7896",
+  border: "#ECEBF6",
+  primary: "#5B4BE3",
+  primarySoft: "#F5F4FF",
+  accent: "#7C6BFF",
+  danger: "#FF5D6C",
+  success: "#1FC9A0",
+  warning: "#FFB23E",
   onPrimary: "#FFFFFF",
 };
 
@@ -42,12 +43,12 @@ const dark: Theme = {
   text: "#F3F4FB",
   muted: "#9AA0B8",
   border: "#262A45",
-  primary: "#8576FF",
-  primarySoft: "#272a4d",
-  accent: "#5B7BFF",
-  danger: "#FF5C7A",
-  success: "#2BD67B",
-  warning: "#FFB74D",
+  primary: "#7C6BFF",
+  primarySoft: "#262248",
+  accent: "#9A8CFF",
+  danger: "#FF5D6C",
+  success: "#22D6AD",
+  warning: "#FFB23E",
   onPrimary: "#FFFFFF",
 };
 
@@ -55,4 +56,4 @@ export function useTheme(): Theme {
   return useColorScheme() === "dark" ? dark : light;
 }
 
-export const GRADIENT = ["#6C5CE7", "#4A6CF7"] as const;
+export const GRADIENT = ["#5B4BE3", "#7C6BFF"] as const;

@@ -23,7 +23,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       </ScrollView>
       <TouchableOpacity
         onPress={retry}
-        style={{ backgroundColor: '#6B4EE6', padding: 14, borderRadius: 999, alignItems: 'center' }}
+        style={{ backgroundColor: '#5B4BE3', padding: 14, borderRadius: 999, alignItems: 'center' }}
       >
         <Text style={{ color: '#fff', fontWeight: '700' }}>Réessayer</Text>
       </TouchableOpacity>
@@ -48,7 +48,7 @@ export default function RootLayout() {
     setRole(r);
   };
 
-  if (role === undefined) return <View style={{ flex: 1, backgroundColor: '#FFF6EC' }} />;
+  if (role === undefined) return <View style={{ flex: 1, backgroundColor: '#FFF6F0' }} />;
   if (role === null) return <RoleChooser onChoose={choose} />;
   if (role === 'child') return <ChildAgent />;
 

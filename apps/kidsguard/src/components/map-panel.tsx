@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#6B4EE6",
+    backgroundColor: "#5B4BE3",
     borderWidth: 3,
     borderColor: "#fff",
     alignItems: "center",
@@ -88,6 +88,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "rgba(107,78,230,0.25)",
     borderWidth: 2,
-    borderColor: "#6B4EE6",
+    borderColor: "#5B4BE3",
   },
 });

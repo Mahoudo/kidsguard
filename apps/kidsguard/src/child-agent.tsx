@@ -43,15 +43,16 @@ import {
 import { giveConsent, hasConsent } from "../lib-child/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "../lib-child/usage";
 
+// Direction "Indigo Soft" — child palette.
 const C = {
-  bg: "#FFF6EC",
-  ink: "#2A2342",
-  muted: "#8A85A0",
-  violet: "#6C5CE7",
-  sun: "#FFB02E",
-  mascot: "#FFE08A",
-  green: "#2BD67B",
-  sos: "#FF5A5F",
+  bg: "#FFF6F0",
+  ink: "#16132E",
+  muted: "#7C7896",
+  violet: "#5B4BE3",
+  sun: "#FFB23E",
+  mascot: "#FFC785",
+  green: "#1FC9A0",
+  sos: "#FF5D6C",
   card: "#FFFFFF",
 };
 
@@ -494,7 +495,7 @@ function AppInner() {
   const allReady = setupSteps.every((step) => step.ok);
   if (!allReady && !setupSkipped) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#FFF6EC" }}>
+      <View style={{ flex: 1, backgroundColor: "#FFF6F0" }}>
         <StatusBar style="dark" />
         <SetupWizard
           steps={setupSteps}

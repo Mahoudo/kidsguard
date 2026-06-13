@@ -136,7 +136,7 @@ export function ChildReport({ childId, childName, onClose }: Props) {
     unresolvedSos: sos.some((x) => !x.resolved_at),
   });
   const barColor = (v: number) =>
-    v >= 80 ? "#21C97A" : v >= 60 ? "#FFA726" : "#FF4D6D";
+    v >= 80 ? "#1FC9A0" : v >= 60 ? "#FFA726" : "#FF4D6D";
 
   const startToday = new Date();
   startToday.setHours(0, 0, 0, 0);
