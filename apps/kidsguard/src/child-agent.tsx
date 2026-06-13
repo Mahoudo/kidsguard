@@ -3,6 +3,7 @@ import { Component, useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Linking,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { SetupWizard, type SetupStep } from "@/components/setup-wizard";
 import { getStoredChildId, pairWithCode, unpair } from "../lib-child/pairing";
 import {
   ensureTracking,
@@ -140,6 +142,7 @@ function AppInner() {
   const [accessOk, setAccessOk] = useState(false);
   const [adminOk, setAdminOk] = useState(false);
   const [batteryOk, setBatteryOk] = useState(false);
+  const [setupSkipped, setSetupSkipped] = useState(false);
   const [showShared, setShowShared] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -215,6 +218,24 @@ function AppInner() {
     }, 60_000);
     return () => clearInterval(iv);
   }, [childId]);
+
+  // Re-read every special-access permission (used by the setup wizard).
+  function recheckPerms() {
+    try {
+      setAccessOk(isAccessibilityEnabled());
+      setAdminOk(isAdminActive());
+      setBatteryOk(isBatteryUnrestricted());
+      setUsageOk(hasUsagePermission());
+    } catch {}
+  }
+
+  // Instant re-check when the user comes back from a Settings screen.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") recheckPerms();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Load the "lost mode" note whenever the device becomes locked.
   useEffect(() => {
@@ -417,10 +438,66 @@ function AppInner() {
     );
   }
 
+  // ----- Setup wizard: guide the parent through the special-access grants -----
+  const setupSteps: SetupStep[] = [
+    {
+      key: "access",
+      icon: "🛡️",
+      title: "Contrôle parental",
+      desc: "Pour appliquer les limites d'apps et le verrouillage définis par les parents.",
+      hint: "Si KidsGuard est grisé : touche ⋮ en haut → « Autoriser les paramètres restreints », puis active-le.",
+      ok: accessOk,
+      onActivate: () => openAccessibilitySettings(),
+    },
+    {
+      key: "battery",
+      icon: "🔋",
+      title: "Rester connecté",
+      desc: "Pour que le téléphone n'éteigne pas KidsGuard en arrière-plan.",
+      hint: "Choisis « Autoriser » / « Pas de restrictions ».",
+      ok: batteryOk,
+      onActivate: () => requestDisableBatteryOptimization(),
+    },
+    {
+      key: "usage",
+      icon: "⏱️",
+      title: "Temps d'écran",
+      desc: "Pour partager le temps d'usage des applications avec les parents.",
+      ok: usageOk,
+      onActivate: grantUsage,
+    },
+    {
+      key: "admin",
+      icon: "🔒",
+      title: "Protection anti-retrait",
+      desc: "Empêche la désinstallation de KidsGuard par l'enfant.",
+      ok: adminOk,
+      onActivate: () => requestAdmin(),
+    },
+  ];
+  const allReady = setupSteps.every((step) => step.ok);
+  if (!allReady && !setupSkipped) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF6EC" }}>
+        <StatusBar style="dark" />
+        <SetupWizard
+          steps={setupSteps}
+          onRecheck={recheckPerms}
+          onSkip={() => setSetupSkipped(true)}
+        />
+      </View>
+    );
+  }
+
   // ----- Active -----
   return (
     <ScrollView contentContainerStyle={s.screen}>
       <StatusBar style="dark" />
+      {!allReady && (
+        <TouchableOpacity style={s.warnBanner} onPress={() => setSetupSkipped(false)}>
+          <Text style={s.warnTxt}>⚠️ Configuration incomplète — terminer</Text>
+        </TouchableOpacity>
+      )}
       <Mascot face={tracking ? "🦁" : "😴"} />
       <Text style={s.h1}>{tracking ? "Tout va bien !" : "En pause"}</Text>
       <Text style={s.sub}>
@@ -547,6 +624,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     padding: 26,
   },
+  warnBanner: {
+    backgroundColor: "#FFE9D6",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    alignSelf: "stretch",
+  },
+  warnTxt: { color: "#b45309", fontWeight: "700", fontSize: 13, textAlign: "center" },
   mascotWrap: { alignItems: "center", marginBottom: 14 },
   mascotRing: {
     width: 132,
