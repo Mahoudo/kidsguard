@@ -172,7 +172,10 @@ function AppInner() {
           { text: "Plus tard", style: "cancel" },
           {
             text: "Répondre",
-            onPress: () => Linking.openURL(`https://meet.jit.si/${room}`),
+            onPress: () =>
+              Linking.openURL(
+                `https://meet.jit.si/${String(room).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)}`
+              ),
           },
         ]);
       },

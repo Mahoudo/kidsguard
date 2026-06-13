@@ -495,7 +495,9 @@ function Dashboard() {
                       onPress={async () => {
                         try {
                           const room = await startCall(item.id);
-                          Linking.openURL(`https://meet.jit.si/${room}`);
+                          Linking.openURL(
+                            `https://meet.jit.si/${String(room).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)}`
+                          );
                         } catch (e: any) {
                           Alert.alert("Erreur", e.message);
                         }

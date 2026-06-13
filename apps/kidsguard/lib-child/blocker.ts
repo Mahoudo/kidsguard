@@ -21,9 +21,15 @@ export {
   lockNow,
 };
 
+// Throttle: a flood of "sync" pushes must not spam the native lock/sync.
+let lastSyncAt = 0;
+
 /** Fetch blocked apps + focus windows + lock state, push them to the native
  *  accessibility service (which enforces them). */
 export async function syncBlockRules(): Promise<void> {
+  const now = Date.now();
+  if (now - lastSyncAt < 2500) return; // at most ~1 sync / 2.5s
+  lastSyncAt = now;
   const childId = await getStoredChildId();
   if (!childId) return;
   try {

@@ -1,11 +1,9 @@
 name: Build KidsGuard (unified, signed)
 
+# Manual trigger only: on a public repo, avoid running secret-bearing builds on
+# every push (defense in depth — audit finding M2).
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "apps/kidsguard/**"
-      - ".github/workflows/build-kidsguard.yml"
 
 jobs:
   build:
