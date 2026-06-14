@@ -3,6 +3,7 @@ import { Component, useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Linking,
   ScrollView,
   StyleSheet,
@@ -173,26 +174,37 @@ function AppInner() {
       },
     });
     getLockState().then(setLocked);
-    try {
-      setAccessOk(isAccessibilityEnabled());
-      setAdminOk(isAdminActive());
-      setBatteryOk(isBatteryUnrestricted());
-    } catch {}
+    const refreshPerms = () => {
+      try {
+        setAccessOk(isAccessibilityEnabled());
+        setAdminOk(isAdminActive());
+        setBatteryOk(isBatteryUnrestricted());
+      } catch {}
+    };
+    refreshPerms();
+    ensureTracking(); // keep the foreground-service heartbeat alive (drives background lock sync)
     syncBlockRules();
     const unsubLock = subscribeLock(childId, (v) => {
       setLocked(v);
       syncBlockRules();
     });
+    // Re-check permissions + re-sync the moment the child returns to the app
+    // (e.g. right after granting Accessibility / Device Admin in Settings).
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") {
+        refreshPerms();
+        ensureTracking();
+        syncBlockRules();
+      }
+    });
     const blockIv = setInterval(() => {
-      try {
-        setAccessOk(isAccessibilityEnabled());
-        setAdminOk(isAdminActive());
-      } catch {}
+      refreshPerms();
       syncBlockRules();
     }, 30_000);
     return () => {
       stopCommandListener();
       unsubLock();
+      sub.remove();
       clearInterval(blockIv);
     };
   }, [childId]);
@@ -414,6 +426,85 @@ function AppInner() {
           <Text style={s.sosSub}>en cas de danger</Text>
         </TouchableOpacity>
       </View>
+    );
+  }
+
+  // ----- Setup obligatoire : sans ces 3 autorisations, le verrou/contrôle parental
+  // ne peut PAS s'appliquer. On bloque l'écran actif tant qu'elles ne sont pas accordées. -----
+  const protectionsReady = accessOk && adminOk && batteryOk;
+  if (!protectionsReady) {
+    const Row = ({
+      ok,
+      icon,
+      label,
+      help,
+      onPress,
+    }: {
+      ok: boolean;
+      icon: string;
+      label: string;
+      help: string;
+      onPress: () => void;
+    }) => (
+      <View style={[s.card, { width: "100%" }]}>
+        <Text style={s.cardText}>
+          {ok ? "✅" : icon} <Text style={{ fontWeight: "800" }}>{label}</Text>
+          {"\n"}
+          <Text style={{ color: C.muted, fontSize: 13 }}>{help}</Text>
+        </Text>
+        {!ok && (
+          <TouchableOpacity style={s.gateBtn} onPress={onPress} activeOpacity={0.85}>
+            <Text style={s.gateBtnTxt}>Activer</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+    return (
+      <ScrollView contentContainerStyle={s.screen}>
+        <StatusBar style="dark" />
+        <Mascot face="🛡️" />
+        <Text style={s.h1}>Dernière étape&nbsp;!</Text>
+        <Text style={s.sub}>
+          Pour que tes parents puissent te protéger, active ces 3 réglages 👇
+        </Text>
+        <Row
+          ok={accessOk}
+          icon="🛡️"
+          label="Contrôle parental"
+          help="Permet d'appliquer les pauses et le blocage d'applis."
+          onPress={() => { try { openAccessibilitySettings(); } catch {} }}
+        />
+        <Row
+          ok={adminOk}
+          icon="🔒"
+          label="Verrouillage à distance"
+          help="Permet à tes parents de verrouiller le téléphone si besoin."
+          onPress={() => { try { requestAdmin(); } catch {} }}
+        />
+        <Row
+          ok={batteryOk}
+          icon="🔋"
+          label="Rester connecté"
+          help="Empêche le téléphone de couper l'appli en arrière-plan."
+          onPress={() => { try { requestDisableBatteryOptimization(); } catch {} }}
+        />
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              setAccessOk(isAccessibilityEnabled());
+              setAdminOk(isAdminActive());
+              setBatteryOk(isBatteryUnrestricted());
+            } catch {}
+          }}
+          style={{ marginTop: 8 }}
+        >
+          <Text style={s.usageLink}>J'ai activé — vérifier ↻</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.sos, { marginTop: 18 }]} onPress={handleSos} activeOpacity={0.85}>
+          <Text style={s.sosTxt}>SOS</Text>
+          <Text style={s.sosSub}>en cas de danger</Text>
+        </TouchableOpacity>
+      </ScrollView>
     );
   }
 
@@ -648,6 +739,15 @@ const s = StyleSheet.create({
     borderRadius: 999,
   },
   arrivedTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  gateBtn: {
+    backgroundColor: C.violet,
+    paddingVertical: 11,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginTop: 10,
+  },
+  gateBtnTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
   pausePill: {
     backgroundColor: C.card,
     paddingVertical: 13,
