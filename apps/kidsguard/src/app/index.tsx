@@ -24,6 +24,7 @@ import {
   createChild,
   createGuardianInvite,
   createPlace,
+  deleteChild,
   getEmergencyPhone,
   listCircle,
   redeemGuardianInvite,
@@ -296,6 +297,28 @@ function Dashboard() {
   function actReport(item: ChildWithLocation) {
     setActionChild(null);
     setReportChild(item);
+  }
+  function actDelete(item: ChildWithLocation) {
+    Alert.alert(
+      "Supprimer l'enfant ?",
+      `Supprime définitivement ${item.name} et toutes ses données (positions, alertes, rapports). Irréversible.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteChild(item.id);
+              setActionChild(null);
+              await refresh();
+            } catch (e: any) {
+              Alert.alert("Erreur", e.message);
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function refresh() {
@@ -696,6 +719,13 @@ function Dashboard() {
               label={actionChild.locked ? "Déverrouiller le téléphone" : "Verrouiller le téléphone"}
               danger={!actionChild.locked}
               onPress={() => actToggleLock(actionChild)}
+            />
+            <ActionRow
+              s={s}
+              icon="🗑️"
+              label="Supprimer l'enfant"
+              danger
+              onPress={() => actDelete(actionChild)}
             />
           </View>
         )}

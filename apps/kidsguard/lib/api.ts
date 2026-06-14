@@ -135,6 +135,12 @@ export async function setChildLock(childId: string, locked: boolean): Promise<vo
   if (error) throw error;
 }
 
+// Permanently delete a child and all its data (cascade). Owning parent only.
+export async function deleteChild(childId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_child", { p_child: childId });
+  if (error) throw error;
+}
+
 // ---- Lost mode (anti-theft) -----------------------------------------------
 export async function setLost(childId: string, on: boolean, note?: string): Promise<void> {
   const { error } = await supabase.rpc("set_lost", {
