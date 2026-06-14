@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Linking,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -189,10 +190,10 @@ function Dashboard() {
     }
   }
   const mapRef = useRef<MapPanelHandle>(null);
-  const lastTap = useRef<{ id: string; t: number }>({ id: "", t: 0 });
   const lastSosId = useRef<string | null>(null);
   const prevBatt = useRef<Record<string, number>>({});
   const [reportChild, setReportChild] = useState<ChildWithLocation | null>(null);
+  const [actionChild, setActionChild] = useState<ChildWithLocation | null>(null);
 
   // Detect a fresh SOS (via realtime OR poll). Vibrate + notify + alert once.
   async function checkSos(initial = false) {
@@ -216,14 +217,6 @@ function Dashboard() {
   }
 
   function onChildPress(item: ChildWithLocation) {
-    const now = Date.now();
-    const isDouble = lastTap.current.id === item.id && now - lastTap.current.t < 320;
-    if (isDouble) {
-      lastTap.current = { id: "", t: 0 };
-      setReportChild(item);
-      return;
-    }
-    lastTap.current = { id: item.id, t: now };
     if (item.pairing_code) {
       // Not paired yet: show / regenerate the pairing code.
       Alert.alert(
@@ -245,11 +238,64 @@ function Dashboard() {
           },
         ]
       );
-    } else if (item.lat != null && item.lng != null) {
+      return;
+    }
+    // Paired: open the labeled actions sheet.
+    setActionChild(item);
+  }
+
+  // ---- Per-child actions (called from the actions sheet) -------------------
+  function actCenterMap(item: ChildWithLocation) {
+    setActionChild(null);
+    if (item.lat != null && item.lng != null) {
       mapRef.current?.centerOn([item.lng, item.lat], 16);
     } else {
       Alert.alert(item.name, "Pas encore de position.");
     }
+  }
+  async function actCall(item: ChildWithLocation) {
+    setActionChild(null);
+    try {
+      const room = await startCall(item.id);
+      Linking.openURL(
+        `https://meet.jit.si/${String(room).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)}`
+      );
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message);
+    }
+  }
+  function actToggleLock(item: ChildWithLocation) {
+    const lock = !item.locked;
+    Alert.alert(
+      lock ? "Verrouiller le téléphone ?" : "Déverrouiller le téléphone ?",
+      lock
+        ? `${item.name} ne pourra plus utiliser son téléphone (sauf SOS) jusqu'au déverrouillage.`
+        : `${item.name} pourra de nouveau utiliser son téléphone.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: lock ? "Verrouiller" : "Déverrouiller",
+          style: lock ? "destructive" : "default",
+          onPress: async () => {
+            try {
+              await setChildLock(item.id, lock);
+              setActionChild(null);
+              await refresh();
+            } catch (e: any) {
+              Alert.alert("Erreur", e.message);
+            }
+          },
+        },
+      ]
+    );
+  }
+  function actRing(item: ChildWithLocation) {
+    setActionChild(null);
+    sendCommand(item.id, "ring").catch((e) => Alert.alert("Erreur", e.message));
+  }
+  function actReport(item: ChildWithLocation) {
+    setActionChild(null);
+    setReportChild(item);
   }
 
   async function refresh() {
@@ -482,55 +528,18 @@ function Dashboard() {
                           : "Jamais localisé"}
                     </Text>
                   </View>
+                  {item.locked && (
+                    <View style={s.lockBadge}>
+                      <Text style={s.lockBadgeTxt}>🔒</Text>
+                    </View>
+                  )}
                   {batt != null && (
                     <View style={[s.battPill, { borderColor: battColor }]}>
                       <Text style={[s.battTxt, { color: battColor }]}>{batt}%</Text>
                     </View>
                   )}
+                  {!item.pairing_code && <Text style={s.chevron}>›</Text>}
                 </TouchableOpacity>
-                {!item.pairing_code && (
-                  <>
-                    <TouchableOpacity
-                      style={s.ring}
-                      onPress={async () => {
-                        try {
-                          const room = await startCall(item.id);
-                          Linking.openURL(
-                            `https://meet.jit.si/${String(room).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)}`
-                          );
-                        } catch (e: any) {
-                          Alert.alert("Erreur", e.message);
-                        }
-                      }}
-                    >
-                      <Text style={s.ringText}>📹</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={s.ring}
-                      onPress={async () => {
-                        try {
-                          await setChildLock(item.id, !item.locked);
-                          await refresh();
-                        } catch (e: any) {
-                          Alert.alert("Erreur", e.message);
-                        }
-                      }}
-                    >
-                      <Text style={s.ringText}>{item.locked ? "🔒" : "🔓"}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={s.ring}
-                      onPress={() =>
-                        sendCommand(item.id, "ring").catch((e) => Alert.alert("Erreur", e.message))
-                      }
-                    >
-                      <Text style={s.ringText}>🔔</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.ring} onPress={() => setReportChild(item)}>
-                      <Text style={s.ringText}>📊</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
               </View>
             );
           }}
@@ -634,8 +643,17 @@ function Dashboard() {
           </View>
         )}
 
-        <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 12 }}>
-          <Text style={[s.muted, { textAlign: "center" }]}>Déconnexion</Text>
+        <View style={s.logoutSep} />
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert("Déconnexion", "Te déconnecter de ce compte parent ?", [
+              { text: "Annuler", style: "cancel" },
+              { text: "Déconnexion", style: "destructive", onPress: () => supabase.auth.signOut() },
+            ])
+          }
+          style={s.logoutBtn}
+        >
+          <Text style={s.logoutTxt}>Déconnexion</Text>
         </TouchableOpacity>
       </SafeAreaView>
 
@@ -646,7 +664,64 @@ function Dashboard() {
           onClose={() => setReportChild(null)}
         />
       )}
+
+      <Modal
+        visible={!!actionChild}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActionChild(null)}
+      >
+        <TouchableOpacity
+          style={s.backdrop}
+          activeOpacity={1}
+          onPress={() => setActionChild(null)}
+        />
+        {actionChild && (
+          <View style={[s.sheet, { paddingBottom: 28 }]}>
+            <View style={s.grabber} />
+            <View style={s.sheetHeader}>
+              <Text style={s.h2}>{actionChild.name}</Text>
+              <TouchableOpacity onPress={() => setActionChild(null)}>
+                <Text style={[s.muted, { fontSize: 22 }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ActionRow s={s} icon="📍" label="Voir sur la carte" onPress={() => actCenterMap(actionChild)} />
+            <ActionRow s={s} icon="📹" label="Appel vidéo" onPress={() => actCall(actionChild)} />
+            <ActionRow s={s} icon="🔔" label="Faire sonner le téléphone" onPress={() => actRing(actionChild)} />
+            <ActionRow s={s} icon="📊" label="Rapport d'activité" onPress={() => actReport(actionChild)} />
+            <ActionRow
+              s={s}
+              icon={actionChild.locked ? "🔓" : "🔒"}
+              label={actionChild.locked ? "Déverrouiller le téléphone" : "Verrouiller le téléphone"}
+              danger={!actionChild.locked}
+              onPress={() => actToggleLock(actionChild)}
+            />
+          </View>
+        )}
+      </Modal>
     </View>
+  );
+}
+
+function ActionRow({
+  s,
+  icon,
+  label,
+  onPress,
+  danger,
+}: {
+  s: any;
+  icon: string;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity style={s.actionRow} onPress={onPress} activeOpacity={0.7}>
+      <Text style={s.actionIcon}>{icon}</Text>
+      <Text style={[s.actionLabel, danger && s.actionLabelDanger]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -818,5 +893,30 @@ function makeStyles(t: Theme) {
       marginLeft: 8,
     },
     ringText: { fontSize: 18 },
+    chevron: { fontSize: 26, color: t.muted, marginLeft: 6, marginRight: 2, fontWeight: "400" },
+    lockBadge: {
+      backgroundColor: t.danger + "22",
+      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      marginRight: 2,
+    },
+    lockBadgeTxt: { fontSize: 12 },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "#00000066" },
+    actionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      paddingVertical: 15,
+      paddingHorizontal: 4,
+      borderTopWidth: 1,
+      borderTopColor: t.border,
+    },
+    actionIcon: { fontSize: 22, width: 28, textAlign: "center" },
+    actionLabel: { fontSize: 16, fontWeight: "600", color: t.text },
+    actionLabelDanger: { color: t.danger, fontWeight: "700" },
+    logoutSep: { height: 1, backgroundColor: t.border, marginTop: 22, marginBottom: 4 },
+    logoutBtn: { alignSelf: "center", paddingVertical: 12, paddingHorizontal: 24, marginTop: 4 },
+    logoutTxt: { color: t.danger, fontWeight: "700", fontSize: 14 },
   });
 }
