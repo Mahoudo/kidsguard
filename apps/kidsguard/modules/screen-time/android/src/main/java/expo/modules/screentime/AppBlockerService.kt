@@ -5,6 +5,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.time.LocalTime
@@ -39,15 +40,20 @@ class AppBlockerService : AccessibilityService() {
     val prefs = getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE)
     val locked = prefs.getBoolean("locked", false)
     val blocked = prefs.getStringSet("blocked", emptySet()) ?: emptySet()
+    Log.d("KGBlock", "evt pkg=$pkg locked=$locked blockedN=${blocked.size}")
 
     // When locked / lost, take over: bring KidsGuard to the front so the child
     // sees the lock message. For focus windows or a single blocked app, a
     // gentler bounce to the home screen is enough.
     if (locked) {
-      // Best-effort real device lock (only effective if a PIN/password is set),
-      // AND always take over the screen with KidsGuard's lock message so the
-      // child can't use any other app — this is what enforces the lock on
-      // devices with no secure-lock credential (dpm.lockNow is a no-op there).
+      // Enforcement order, most-reliable first:
+      // 1) GLOBAL_ACTION_HOME always works from an accessibility service and is
+      //    NOT subject to background-activity-launch limits — it boots the child
+      //    out of whatever app they opened. This is the dependable lock on
+      //    HyperOS/MIUI where startActivity from the background is blocked.
+      // 2) lockDevice() is a real screen lock when a PIN exists (no-op otherwise).
+      // 3) launchKidsGuard() shows the friendly lock message when allowed.
+      performGlobalAction(GLOBAL_ACTION_HOME)
       lockDevice()
       launchKidsGuard()
     } else if (inFocusWindow(prefs) || blocked.contains(pkg)) {
