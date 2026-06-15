@@ -44,9 +44,12 @@ class AppBlockerService : AccessibilityService() {
     // sees the lock message. For focus windows or a single blocked app, a
     // gentler bounce to the home screen is enough.
     if (locked) {
-      // Real device lock (PIN) if admin is active; otherwise fall back to
-      // bringing KidsGuard (with its lock message) to the front.
-      if (!lockDevice()) launchKidsGuard()
+      // Best-effort real device lock (only effective if a PIN/password is set),
+      // AND always take over the screen with KidsGuard's lock message so the
+      // child can't use any other app — this is what enforces the lock on
+      // devices with no secure-lock credential (dpm.lockNow is a no-op there).
+      lockDevice()
+      launchKidsGuard()
     } else if (inFocusWindow(prefs) || blocked.contains(pkg)) {
       performGlobalAction(GLOBAL_ACTION_HOME)
     }
