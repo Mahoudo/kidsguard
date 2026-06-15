@@ -5,15 +5,19 @@ import Constants from "expo-constants";
 import { getStoredChildId } from "./pairing";
 import { supabase } from "./supabase";
 import { syncBlockRules } from "./blocker";
+import { processPendingCommands } from "./commands";
 
 const PUSH_TASK = "kidsguard-push-sync";
 
 // Background handler: a silent "sync" push wakes the app (even when closed) and
-// reapplies the block/lock rules immediately. syncBlockRules also calls the
+// reapplies the block/lock rules immediately + runs any queued parent commands
+// (e.g. "ring") that we missed while offline. syncBlockRules also calls the
 // real screen lock when the device is locked.
 TaskManager.defineTask(PUSH_TASK, async () => {
   try {
+    const childId = await getStoredChildId();
     await syncBlockRules();
+    await processPendingCommands(childId ?? undefined);
   } catch {}
 });
 
@@ -50,6 +54,7 @@ export function listenChildPush(): () => void {
   const sub = Notifications.addNotificationReceivedListener((n) => {
     if ((n.request.content.data as any)?.type === "sync") {
       syncBlockRules().catch(() => {});
+      processPendingCommands().catch(() => {});
     }
   });
   return () => sub.remove();

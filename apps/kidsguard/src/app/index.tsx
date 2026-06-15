@@ -292,7 +292,11 @@ function Dashboard() {
   }
   function actRing(item: ChildWithLocation) {
     setActionChild(null);
-    sendCommand(item.id, "ring").catch((e) => Alert.alert("Erreur", e.message));
+    sendCommand(item.id, "ring")
+      .then(() =>
+        Alert.alert("🔔 Sonnerie envoyée", `Le téléphone de ${item.name} va sonner (même en silencieux).`)
+      )
+      .catch((e) => Alert.alert("Erreur", e.message));
   }
   function actReport(item: ChildWithLocation) {
     setActionChild(null);

@@ -35,10 +35,51 @@ function stopSiren() {
 }
 
 /** Listen for parent commands (ring / stop_ring / call) addressed to this child. */
+type Cmd = { id: string; type: string; payload?: { room?: string } };
+
+// Last onCall handler, so wake-driven replays (push) can honor "call" too.
+let callHandler: ((room: string) => void) | undefined;
+let lastChildId: string | null = null;
+
+async function runCommand(cmd: Cmd) {
+  if (cmd.type === "ring") {
+    await playSiren();
+    if (stopTimer) clearTimeout(stopTimer);
+    stopTimer = setTimeout(stopSiren, 30_000);
+  } else if (cmd.type === "stop_ring") {
+    stopSiren();
+  } else if (cmd.type === "call") {
+    const room = cmd.payload?.room;
+    if (room) callHandler?.(room);
+  }
+  await supabase.from("commands").update({ status: "done" }).eq("id", cmd.id);
+}
+
+/**
+ * Execute any commands the parent queued while we weren't subscribed (app
+ * killed/backgrounded by MIUI). Called on listener start and on push-wake —
+ * this is what makes "ring" reliable when the app wasn't already live.
+ */
+export async function processPendingCommands(childId?: string): Promise<void> {
+  const id = childId ?? lastChildId;
+  if (!id) return;
+  const { data } = await supabase
+    .from("commands")
+    .select("id,type,payload")
+    .eq("child_id", id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  for (const cmd of (data as Cmd[]) ?? []) {
+    await runCommand(cmd);
+  }
+}
+
 export function startCommandListener(
   childId: string,
   opts?: { onCall?: (room: string) => void }
 ) {
+  lastChildId = childId;
+  callHandler = opts?.onCall;
   if (channel) return;
   channel = supabase
     .channel(`commands-${childId}`)
@@ -51,28 +92,12 @@ export function startCommandListener(
         filter: `child_id=eq.${childId}`,
       },
       async (payload) => {
-        const cmd = payload.new as {
-          id: string;
-          type: string;
-          payload?: { room?: string };
-        };
-        if (cmd.type === "ring") {
-          await playSiren();
-          if (stopTimer) clearTimeout(stopTimer);
-          stopTimer = setTimeout(stopSiren, 30_000);
-        } else if (cmd.type === "stop_ring") {
-          stopSiren();
-        } else if (cmd.type === "call") {
-          const room = cmd.payload?.room;
-          if (room) opts?.onCall?.(room);
-        }
-        await supabase
-          .from("commands")
-          .update({ status: "done" })
-          .eq("id", cmd.id);
+        await runCommand(payload.new as Cmd);
       }
     )
     .subscribe();
+  // Replay anything that arrived while we were offline.
+  processPendingCommands(childId).catch(() => {});
 }
 
 export function stopCommandListener() {
