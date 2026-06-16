@@ -61,9 +61,13 @@ export async function syncBlockRules(force = false): Promise<void> {
       supabase.rpc("my_pause", { p_child: childId }),
     ]);
 
-    // An active, parent-granted pause suspends all enforcement.
+    const isLocked = !!(childRes.data as any)?.locked;
+
+    // An active, parent-granted pause suspends enforcement — UNLESS the parent
+    // has locked the device. A lock always wins over a pause (a parent locking
+    // the phone expects it locked even if a pause was previously granted).
     const pausedUntil = pauseRes.data ? new Date(pauseRes.data as string).getTime() : 0;
-    if (pausedUntil > Date.now()) {
+    if (!isLocked && pausedUntil > Date.now()) {
       setBlockRules({
         packages: [],
         studyEnabled: false,
@@ -81,7 +85,6 @@ export async function syncBlockRules(force = false): Promise<void> {
       .filter((l: any) => l.blocked)
       .map((l: any) => l.package as string);
     const f: any = (focusRes.data as any[])?.[0] ?? {};
-    const isLocked = !!(childRes.data as any)?.locked;
     // Auto school mode: while inside a school zone, Études is on all day.
     const atSchool = !!(childRes.data as any)?.at_school;
     setBlockRules({
