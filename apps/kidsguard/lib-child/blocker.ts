@@ -22,13 +22,34 @@ export {
 };
 
 // Throttle: a flood of "sync" pushes must not spam the native lock/sync.
+// The throttle COALESCES — it never drops a sync. When called inside the
+// window, it schedules a trailing run so a state change (e.g. a lock) can't be
+// silently lost. State-changing callers (lock/command realtime, push wake,
+// app resume) pass force=true to bypass entirely.
 let lastSyncAt = 0;
+let pendingSync = false;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Fetch blocked apps + focus windows + lock state, push them to the native
  *  accessibility service (which enforces them). */
-export async function syncBlockRules(): Promise<void> {
+export async function syncBlockRules(force = false): Promise<void> {
   const now = Date.now();
-  if (now - lastSyncAt < 2500) return; // at most ~1 sync / 2.5s
+  if (!force && now - lastSyncAt < 2500) {
+    if (!pendingSync) {
+      pendingSync = true;
+      syncTimer = setTimeout(() => {
+        pendingSync = false;
+        syncTimer = null;
+        syncBlockRules(true).catch(() => {});
+      }, 2500 - (now - lastSyncAt));
+    }
+    return;
+  }
+  if (syncTimer) {
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    pendingSync = false;
+  }
   lastSyncAt = now;
   const childId = await getStoredChildId();
   if (!childId) return;

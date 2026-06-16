@@ -16,7 +16,7 @@ const PUSH_TASK = "kidsguard-push-sync";
 TaskManager.defineTask(PUSH_TASK, async () => {
   try {
     const childId = await getStoredChildId();
-    await syncBlockRules();
+    await syncBlockRules(true);
     await processPendingCommands(childId ?? undefined);
   } catch {}
 });
@@ -53,7 +53,7 @@ export async function registerChildPush(): Promise<void> {
 export function listenChildPush(): () => void {
   const sub = Notifications.addNotificationReceivedListener((n) => {
     if ((n.request.content.data as any)?.type === "sync") {
-      syncBlockRules().catch(() => {});
+      syncBlockRules(true).catch(() => {});
       processPendingCommands().catch(() => {});
     }
   });

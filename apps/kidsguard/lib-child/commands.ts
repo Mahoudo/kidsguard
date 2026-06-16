@@ -42,6 +42,16 @@ let callHandler: ((room: string) => void) | undefined;
 let lastChildId: string | null = null;
 
 async function runCommand(cmd: Cmd) {
+  // Claim atomically: flip pending->done and act ONLY if we won the row. This
+  // makes delivery exactly-once when realtime INSERT and processPendingCommands
+  // race for the same command (otherwise the siren would fire twice).
+  const { data: claimed } = await supabase
+    .from("commands")
+    .update({ status: "done" })
+    .eq("id", cmd.id)
+    .eq("status", "pending")
+    .select("id");
+  if (!claimed || claimed.length === 0) return; // already handled elsewhere
   if (cmd.type === "ring") {
     await playSiren();
     if (stopTimer) clearTimeout(stopTimer);
@@ -52,7 +62,6 @@ async function runCommand(cmd: Cmd) {
     const room = cmd.payload?.room;
     if (room) callHandler?.(room);
   }
-  await supabase.from("commands").update({ status: "done" }).eq("id", cmd.id);
 }
 
 /**
@@ -106,4 +115,6 @@ export function stopCommandListener() {
     supabase.removeChannel(channel);
     channel = null;
   }
+  lastChildId = null; // avoid replaying the old child's commands after re-pair
+  callHandler = undefined;
 }

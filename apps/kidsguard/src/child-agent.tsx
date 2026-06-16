@@ -22,7 +22,7 @@ import {
   startTracking,
   stopTracking,
 } from "../lib-child/location";
-import { startCommandListener, stopCommandListener } from "../lib-child/commands";
+import { startCommandListener, stopCommandListener, processPendingCommands } from "../lib-child/commands";
 import { raiseSos, sendSosSms } from "../lib-child/sos";
 import { sendCheckin, type Mood } from "../lib-child/checkin";
 import { cacheEmergencyPhone } from "../lib-child/emergency";
@@ -190,7 +190,7 @@ function AppInner() {
     syncBlockRules();
     const unsubLock = subscribeLock(childId, (v) => {
       setLocked(v);
-      syncBlockRules();
+      syncBlockRules(true); // state change -> never throttle a lock
     });
     const blockIv = setInterval(() => {
       try {
@@ -237,13 +237,21 @@ function AppInner() {
     } catch {}
   }
 
-  // Instant re-check when the user comes back from a Settings screen.
+  // On resume: re-check permissions AND force a fresh REST resync of lock state
+  // + replay pending commands. MIUI freezes the app and kills the realtime
+  // socket; these REST calls recover the current state instantly (C3), so a
+  // lock/ring issued while we were frozen takes effect the moment we wake.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (st) => {
-      if (st === "active") recheckPerms();
+      if (st !== "active") return;
+      recheckPerms();
+      if (childId) {
+        syncBlockRules(true).catch(() => {});
+        processPendingCommands(childId).catch(() => {});
+      }
     });
     return () => sub.remove();
-  }, []);
+  }, [childId]);
 
   // Load the "lost mode" note whenever the device becomes locked.
   useEffect(() => {
