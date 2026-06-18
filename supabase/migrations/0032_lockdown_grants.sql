@@ -10,24 +10,30 @@
 -- ---------------------------------------------------------------------------
 -- C1 — internal SECURITY DEFINER helpers must NOT be callable via supabase.rpc()
 -- (they have no authorization check; they're only meant to run inside triggers).
+-- Tolerant loop: only revokes the helpers that actually exist in this DB, so a
+-- partially-applied migration history doesn't error the whole script.
 -- ---------------------------------------------------------------------------
-revoke execute on function owner_push_token(uuid)                 from public, anon, authenticated;
-revoke execute on function send_expo_push(text, text, text, jsonb) from public, anon, authenticated;
-revoke execute on function push_child_sync(uuid)                  from public, anon, authenticated;
-
--- Trigger / cron functions — never called by a client.
-revoke execute on function fn_check_geofence()       from public, anon, authenticated;
-revoke execute on function fn_check_offline()        from public, anon, authenticated;
-revoke execute on function fn_family_owner_member()  from public, anon, authenticated;
-revoke execute on function fn_push_checkin()         from public, anon, authenticated;
-revoke execute on function fn_push_geofence()        from public, anon, authenticated;
-revoke execute on function fn_push_sos()             from public, anon, authenticated;
-revoke execute on function fn_wake_child_change()    from public, anon, authenticated;
-revoke execute on function fn_wake_child_command()   from public, anon, authenticated;
-revoke execute on function fn_wake_child_limit()     from public, anon, authenticated;
-revoke execute on function fn_wake_child_pause()     from public, anon, authenticated;
-revoke execute on function fn_weekly_digest()        from public, anon, authenticated;
-revoke execute on function handle_new_user()         from public, anon, authenticated;
+do $$
+declare r record;
+begin
+  for r in
+    select format('public.%I(%s)', p.proname,
+                  pg_get_function_identity_arguments(p.oid)) as sig
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in (
+        'owner_push_token', 'send_expo_push', 'push_child_sync',
+        'fn_check_geofence', 'fn_check_offline', 'fn_family_owner_member',
+        'fn_push_checkin', 'fn_push_geofence', 'fn_push_sos',
+        'fn_wake_child_change', 'fn_wake_child_command', 'fn_wake_child_limit',
+        'fn_wake_child_pause', 'fn_weekly_digest', 'handle_new_user'
+      )
+  loop
+    execute format(
+      'revoke execute on function %s from public, anon, authenticated', r.sig);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- H2 — `children` is `for all` (UPDATE/DELETE) for any owner OR guardian, so a
