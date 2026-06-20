@@ -62,44 +62,49 @@ class ScreenTimeModule : Module() {
     // activity in turn, falling back to this app's details page so the user can
     // always reach a relevant screen.
     Function("openAutostartSettings") {
-      val ctx = appContext.reactContext ?: return@Function
-      val candidates = listOf(
-        ComponentName("com.miui.securitycenter",
-          "com.miui.permcenter.autostart.AutoStartManagementActivity"),
-        ComponentName("com.transsion.phonemanager",
-          "com.itel.autobootmanager.activity.AutoBootMgrActivity"),
-        ComponentName("com.transsion.phonemanager",
-          "com.cyin.himgr.autostart.AutoStartActivity"),
-        ComponentName("com.coloros.safecenter",
-          "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
-        ComponentName("com.coloros.safecenter",
-          "com.coloros.safecenter.startupapp.StartupAppListActivity"),
-        ComponentName("com.iqoo.secure",
-          "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"),
-        ComponentName("com.vivo.permissionmanager",
-          "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
-        ComponentName("com.huawei.systemmanager",
-          "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
-        ComponentName("com.huawei.systemmanager",
-          "com.huawei.systemmanager.optimize.process.ProtectActivity")
-      )
-      for (comp in candidates) {
-        try {
-          val intent = Intent().apply {
-            component = comp
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val candidates = listOf(
+          ComponentName("com.miui.securitycenter",
+            "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+          ComponentName("com.transsion.phonemanager",
+            "com.itel.autobootmanager.activity.AutoBootMgrActivity"),
+          ComponentName("com.transsion.phonemanager",
+            "com.cyin.himgr.autostart.AutoStartActivity"),
+          ComponentName("com.coloros.safecenter",
+            "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
+          ComponentName("com.coloros.safecenter",
+            "com.coloros.safecenter.startupapp.StartupAppListActivity"),
+          ComponentName("com.iqoo.secure",
+            "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"),
+          ComponentName("com.vivo.permissionmanager",
+            "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+          ComponentName("com.huawei.systemmanager",
+            "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+          ComponentName("com.huawei.systemmanager",
+            "com.huawei.systemmanager.optimize.process.ProtectActivity")
+        )
+        var opened = false
+        for (comp in candidates) {
+          if (!opened) {
+            try {
+              ctx.startActivity(Intent().apply {
+                component = comp
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+              })
+              opened = true
+            } catch (e: Exception) { /* try next */ }
           }
-          ctx.startActivity(intent)
-          return@Function
-        } catch (e: Exception) { /* try next */ }
+        }
+        if (!opened) {
+          try {
+            ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+              data = Uri.parse("package:" + ctx.packageName)
+              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+          } catch (e: Exception) {}
+        }
       }
-      // Fallback: app details page.
-      try {
-        ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-          data = Uri.parse("package:" + ctx.packageName)
-          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
-      } catch (e: Exception) {}
     }
 
     // Per-app foreground time since local midnight.
