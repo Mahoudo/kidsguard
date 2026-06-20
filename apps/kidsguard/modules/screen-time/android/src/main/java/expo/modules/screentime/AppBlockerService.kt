@@ -42,7 +42,7 @@ class AppBlockerService : AccessibilityService() {
   private fun currentUsageMin(): Int {
     val now = System.currentTimeMillis()
     if (now - usageAt > 60_000L) {
-      usageMin = ScreenUsage.todayMinutes(this)
+      usageMin = try { ScreenUsage.todayMinutes(this) } catch (e: Throwable) { 0 }
       usageAt = now
     }
     return usageMin
@@ -62,10 +62,16 @@ class AppBlockerService : AccessibilityService() {
   // every app except KidsGuard itself (so its screen + SOS stay usable).
   private val lockWatcher = object : Runnable {
     override fun run() {
-      val reason = blockReason(getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE))
-      if (reason == null) { hideLockOverlay(); watching = false; return }
-      if (lastPkg == packageName) hideLockOverlay() else showLockOverlay(reason == "cap")
-      handler.postDelayed(this, 1200)
+      try {
+        val reason = blockReason(getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE))
+        if (reason == null) { hideLockOverlay(); watching = false; return }
+        if (lastPkg == packageName) hideLockOverlay() else showLockOverlay(reason == "cap")
+        handler.postDelayed(this, 1200)
+      } catch (e: Throwable) {
+        // An accessibility service must never crash (MIUI won't rebind it).
+        Log.d("KGBlock", "watcher error: ${e.message}")
+        handler.postDelayed(this, 1200)
+      }
     }
   }
 
@@ -77,10 +83,18 @@ class AppBlockerService : AccessibilityService() {
 
   override fun onServiceConnected() {
     super.onServiceConnected()
-    ensureWatching() // re-arm if we (re)connect while already locked
+    try { ensureWatching() } catch (e: Throwable) {} // never crash on bind
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    try {
+      handleEvent(event)
+    } catch (e: Throwable) {
+      Log.d("KGBlock", "event error: ${e.message}")
+    }
+  }
+
+  private fun handleEvent(event: AccessibilityEvent?) {
     if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
     val pkg = event.packageName?.toString() ?: return
     lastPkg = pkg
