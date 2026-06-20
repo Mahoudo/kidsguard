@@ -38,8 +38,11 @@ import {
   requestAdmin,
   isBatteryUnrestricted,
   requestDisableBatteryOptimization,
+  isAggressiveOem,
+  openAutostartSettings,
   syncBlockRules,
 } from "../lib-child/blocker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { giveConsent, hasConsent } from "../lib-child/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "../lib-child/usage";
 
@@ -145,6 +148,8 @@ function AppInner() {
   const [adminOk, setAdminOk] = useState(false);
   const [batteryOk, setBatteryOk] = useState(false);
   const [setupSkipped, setSetupSkipped] = useState(false);
+  const [needAutostart, setNeedAutostart] = useState(false);
+  const [autostartOk, setAutostartOk] = useState(false);
   const [showShared, setShowShared] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -258,6 +263,23 @@ function AppInner() {
     if (locked) getLostNote().then(setLostNote);
     else setLostNote(null);
   }, [locked]);
+
+  // Autostart step: only on aggressive OEMs (no API to read the grant, so we
+  // persist the user's acknowledgement once they've been to the screen).
+  useEffect(() => {
+    try {
+      setNeedAutostart(isAggressiveOem());
+    } catch {}
+    AsyncStorage.getItem("kg_autostart_ack")
+      .then((v) => setAutostartOk(v === "1"))
+      .catch(() => {});
+  }, []);
+
+  function activateAutostart() {
+    openAutostartSettings();
+    setAutostartOk(true);
+    AsyncStorage.setItem("kg_autostart_ack", "1").catch(() => {});
+  }
 
   async function handlePause() {
     try {
@@ -499,6 +521,19 @@ function AppInner() {
       ok: adminOk,
       onActivate: () => requestAdmin(),
     },
+    ...(needAutostart
+      ? [
+          {
+            key: "autostart",
+            icon: "🚀",
+            title: "Démarrage automatique",
+            desc: "Indispensable sur ce téléphone : sans ça, le système coupe KidsGuard et la localisation s'arrête.",
+            hint: "Active KidsGuard dans la liste « Démarrage auto » qui s'ouvre, puis reviens et touche « J'ai activé ».",
+            ok: autostartOk,
+            onActivate: activateAutostart,
+          },
+        ]
+      : []),
   ];
   const allReady = setupSteps.every((step) => step.ok);
   if (!allReady && !setupSkipped) {

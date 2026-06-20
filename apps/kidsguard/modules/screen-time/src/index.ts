@@ -107,6 +107,23 @@ export function lockNow(): void {
   } catch {}
 }
 
+/** True on OEMs (Xiaomi/Transsion/Oppo/Vivo/Huawei…) that gate "Autostart"
+ *  behind their security app and aggressively kill background apps. */
+export function isAggressiveOem(): boolean {
+  try {
+    return ScreenTime?.isAggressiveOem?.() ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** Deep-link to the OEM "Autostart" / "Auto-launch" manager. No-op if unavailable. */
+export function openAutostartSettings(): void {
+  try {
+    ScreenTime?.openAutostartSettings?.();
+  } catch {}
+}
+
 /** SIM identity "MCC+MNC|operatorName", or null if no SIM / unavailable. */
 export function getSimInfo(): string | null {
   try {

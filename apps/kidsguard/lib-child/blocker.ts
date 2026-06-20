@@ -9,6 +9,8 @@ import {
   requestDisableBatteryOptimization,
   lockNow,
   setBlockRules,
+  isAggressiveOem,
+  openAutostartSettings,
 } from "../modules/screen-time";
 
 export {
@@ -19,6 +21,8 @@ export {
   isBatteryUnrestricted,
   requestDisableBatteryOptimization,
   lockNow,
+  isAggressiveOem,
+  openAutostartSettings,
 };
 
 // Throttle: a flood of "sync" pushes must not spam the native lock/sync.

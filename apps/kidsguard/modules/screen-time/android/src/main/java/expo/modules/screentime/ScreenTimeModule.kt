@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.content.ContentUris
+import android.os.Build
 import android.os.PowerManager
 import android.os.Process
 import android.provider.MediaStore
@@ -43,6 +44,62 @@ class ScreenTimeModule : Module() {
         }
         ctx.startActivity(intent)
       }
+    }
+
+    // True on OEMs that aggressively kill background apps and gate an "Autostart"
+    // permission behind their own security app (MIUI/HyperOS, Transsion = Tecno/
+    // Infinix/itel, ColorOS/Funtouch). On these, Autostart is the #1 reason
+    // tracking + enforcement silently stop, and there is no API to read it.
+    Function("isAggressiveOem") {
+      val m = Build.MANUFACTURER.lowercase()
+      val b = Build.BRAND.lowercase()
+      listOf("xiaomi", "redmi", "poco", "tecno", "infinix", "itel", "transsion",
+             "oppo", "vivo", "realme", "oneplus", "huawei", "honor")
+        .any { m.contains(it) || b.contains(it) }
+    }
+
+    // Deep-link to the OEM "Autostart" / "Auto-launch" manager. Tries each known
+    // activity in turn, falling back to this app's details page so the user can
+    // always reach a relevant screen.
+    Function("openAutostartSettings") {
+      val ctx = appContext.reactContext ?: return@Function
+      val candidates = listOf(
+        ComponentName("com.miui.securitycenter",
+          "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+        ComponentName("com.transsion.phonemanager",
+          "com.itel.autobootmanager.activity.AutoBootMgrActivity"),
+        ComponentName("com.transsion.phonemanager",
+          "com.cyin.himgr.autostart.AutoStartActivity"),
+        ComponentName("com.coloros.safecenter",
+          "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
+        ComponentName("com.coloros.safecenter",
+          "com.coloros.safecenter.startupapp.StartupAppListActivity"),
+        ComponentName("com.iqoo.secure",
+          "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"),
+        ComponentName("com.vivo.permissionmanager",
+          "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+        ComponentName("com.huawei.systemmanager",
+          "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+        ComponentName("com.huawei.systemmanager",
+          "com.huawei.systemmanager.optimize.process.ProtectActivity")
+      )
+      for (comp in candidates) {
+        try {
+          val intent = Intent().apply {
+            component = comp
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          }
+          ctx.startActivity(intent)
+          return@Function
+        } catch (e: Exception) { /* try next */ }
+      }
+      // Fallback: app details page.
+      try {
+        ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+          data = Uri.parse("package:" + ctx.packageName)
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+      } catch (e: Exception) {}
     }
 
     // Per-app foreground time since local midnight.
