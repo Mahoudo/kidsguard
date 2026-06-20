@@ -11,6 +11,7 @@ import {
   setBlockRules,
   isAggressiveOem,
   openAutostartSettings,
+  openPrivateDnsSettings,
 } from "../modules/screen-time";
 
 export {
@@ -23,6 +24,7 @@ export {
   lockNow,
   isAggressiveOem,
   openAutostartSettings,
+  openPrivateDnsSettings,
 };
 
 // Throttle: a flood of "sync" pushes must not spam the native lock/sync.
@@ -83,6 +85,13 @@ export async function syncBlockRules(force = false): Promise<void> {
       atSchool = !!(sch.data as any)?.at_school;
     } catch {}
 
+    // Daily screen-time cap (base + today's bonus), best-effort. 0 = no cap.
+    let dailyLimitMin = 0;
+    try {
+      const q = await supabase.rpc("my_screen_quota", { p_child: childId });
+      dailyLimitMin = (q.data as number | null) ?? 0;
+    } catch {}
+
     // An active, parent-granted pause suspends enforcement — UNLESS the parent
     // has locked the device. A lock always wins over a pause (a parent locking
     // the phone expects it locked even if a pause was previously granted).
@@ -97,6 +106,7 @@ export async function syncBlockRules(force = false): Promise<void> {
         sleepStart: null,
         sleepEnd: null,
         locked: false,
+        dailyLimitMin: 0, // a granted pause also suspends the daily cap
       });
       return;
     }
@@ -115,6 +125,7 @@ export async function syncBlockRules(force = false): Promise<void> {
       sleepStart: f.sleep_start ?? null,
       sleepEnd: f.sleep_end ?? null,
       locked: isLocked,
+      dailyLimitMin,
     });
     // Real screen lock when the parent locked the device (needs device admin).
     if (isLocked) lockNow();

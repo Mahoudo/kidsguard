@@ -10,10 +10,15 @@ import {
 import { useTheme, type Theme } from "../theme";
 import {
   getAutoSchool,
+  getDailyLimit,
   getFocus,
+  grantScreenBonus,
   giveSupervisionConsent,
   listAppLimits,
+  listInstalledApps,
   setAutoSchool,
+  setDailyLimit,
+  type InstalledApp,
   pendingPauses,
   respondPause,
   setAppLimit,
@@ -76,6 +81,9 @@ export function ChildControls({
   const [sup, setSup] = useState<SupervisionStatus | null>(null);
   const [year, setYear] = useState("");
   const [autoSchool, setAutoSch] = useState(false);
+  const [limitInput, setLimitInput] = useState("");
+  const [bonusInput, setBonusInput] = useState("");
+  const [installed, setInstalled] = useState<InstalledApp[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -92,8 +100,44 @@ export function ChildControls({
       setNames(nm);
       setSup(await supervisionStatus(childId).catch(() => null));
       setAutoSch(await getAutoSchool(childId).catch(() => false));
+      const dl = await getDailyLimit(childId).catch(() => null);
+      setLimitInput(dl ? String(dl) : "");
+      setInstalled(await listInstalledApps(childId).catch(() => []));
     })();
   }, [childId]);
+
+  async function toggleInstalled(app: InstalledApp, block: boolean) {
+    setInstalled((prev) =>
+      prev.map((a) => (a.package === app.package ? { ...a, blocked: block } : a))
+    );
+    try {
+      await setAppLimit(childId, app.package, app.name, block);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function saveDailyLimit() {
+    const m = parseInt(limitInput, 10);
+    try {
+      await setDailyLimit(childId, isNaN(m) ? 0 : m);
+      Alert.alert("Plafond enregistré", isNaN(m) || m === 0 ? "Aucune limite." : `${m} min / jour.`);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
+
+  async function giveBonus() {
+    const m = parseInt(bonusInput, 10);
+    if (isNaN(m) || m <= 0) return;
+    try {
+      await grantScreenBonus(childId, m);
+      setBonusInput("");
+      Alert.alert("Bonus accordé", `+${m} min aujourd'hui 🎁`);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? String(e));
+    }
+  }
 
   async function toggleAutoSchool(on: boolean) {
     setAutoSch(on);
@@ -302,6 +346,35 @@ export function ChildControls({
         Active le blocage automatiquement quand l'enfant entre dans une zone « école ».
       </Text>
 
+      <View style={s.sep} />
+      <Text style={s.subtitle}>⏱️ Temps d'écran par jour</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <TextInput
+          style={[s.input, { flex: 1, marginBottom: 0 }]}
+          placeholder="Minutes / jour (vide = illimité)"
+          placeholderTextColor={t.muted}
+          keyboardType="number-pad"
+          value={limitInput}
+          onChangeText={(x) => setLimitInput(x.replace(/[^0-9]/g, ""))}
+        />
+        <Text style={s.miniBtn} onPress={saveDailyLimit}>OK</Text>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+        <TextInput
+          style={[s.input, { flex: 1, marginBottom: 0 }]}
+          placeholder="Bonus du jour (min)"
+          placeholderTextColor={t.muted}
+          keyboardType="number-pad"
+          value={bonusInput}
+          onChangeText={(x) => setBonusInput(x.replace(/[^0-9]/g, ""))}
+        />
+        <Text style={[s.miniBtn, { backgroundColor: t.success }]} onPress={giveBonus}>🎁 +</Text>
+      </View>
+      <Text style={s.muted}>
+        L'enfant est verrouillé quand le total d'écran du jour atteint la limite. Le bonus s'ajoute pour aujourd'hui.
+      </Text>
+
+      <View style={s.sep} />
       <Text style={[s.subtitle, { marginTop: 12 }]}>Bloquer des applis</Text>
       {apps.length === 0 ? (
         <Text style={s.muted}>Aucune appli détectée encore.</Text>
@@ -335,6 +408,37 @@ export function ChildControls({
       <Text style={s.muted}>
         Verrouille le téléphone et affiche un message « perdu ». Le SOS reste
         accessible. Aucun micro/caméra activé.
+      </Text>
+
+      <View style={s.sep} />
+      <Text style={s.subtitle}>
+        📲 Apps installées{installed.length ? ` (${installed.length})` : ""}
+      </Text>
+      {installed.length === 0 ? (
+        <Text style={s.muted}>Aucune app remontée pour l'instant.</Text>
+      ) : (
+        installed.slice(0, 30).map((app) => {
+          const isNew = Date.now() - new Date(app.first_seen).getTime() < 48 * 3600 * 1000;
+          return (
+            <View key={app.package} style={s.focusRow}>
+              <Text style={[s.focusLabel, { flex: 1 }]} numberOfLines={1}>
+                {isNew ? "🆕 " : ""}
+                {app.name}
+              </Text>
+              <Text style={[s.muted, { marginRight: 8 }]}>
+                {app.blocked ? "Bloquée" : "OK"}
+              </Text>
+              <Switch
+                value={app.blocked}
+                onValueChange={(v) => toggleInstalled(app, v)}
+                trackColor={{ true: t.danger }}
+              />
+            </View>
+          );
+        })
+      )}
+      <Text style={s.muted}>
+        🆕 = installée récemment. Active l'interrupteur pour bloquer une app.
       </Text>
 
       <View style={s.sep} />
@@ -384,6 +488,24 @@ function makeStyles(t: Theme) {
     subtitle: { fontSize: 13, fontWeight: "700", color: t.text, marginBottom: 6 },
     muted: { color: t.muted, fontSize: 12 },
     sep: { height: 1, backgroundColor: t.border, marginVertical: 12 },
+    input: {
+      backgroundColor: t.cardAlt,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: t.text,
+    },
+    miniBtn: {
+      backgroundColor: t.primary,
+      color: t.onPrimary,
+      fontWeight: "800",
+      fontSize: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+      borderRadius: 10,
+      overflow: "hidden",
+    },
     pauseBox: {
       backgroundColor: t.cardAlt,
       borderRadius: 12,

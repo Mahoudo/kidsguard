@@ -141,6 +141,62 @@ export async function deleteChild(childId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ---- Daily screen-time cap + bonus ---------------------------------------
+export async function getDailyLimit(childId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("children")
+    .select("daily_limit_min")
+    .eq("id", childId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as any)?.daily_limit_min ?? null;
+}
+
+/** Set the total daily screen-time cap in minutes (0/null = no cap). */
+export async function setDailyLimit(childId: string, minutes: number): Promise<void> {
+  const { error } = await supabase.rpc("set_daily_limit", {
+    p_child: childId,
+    p_min: minutes,
+  });
+  if (error) throw error;
+}
+
+/** Grant bonus screen-time minutes for today (chores, grades…). */
+export async function grantScreenBonus(
+  childId: string,
+  minutes: number,
+  reason?: string
+): Promise<void> {
+  const { error } = await supabase.rpc("grant_screen_bonus", {
+    p_child: childId,
+    p_min: minutes,
+    p_reason: reason ?? null,
+  });
+  if (error) throw error;
+}
+
+/** Effective cap for today (base + bonus), or null if no cap. */
+export async function getScreenQuota(childId: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc("my_screen_quota", { p_child: childId });
+  if (error) throw error;
+  return (data as number | null) ?? null;
+}
+
+// ---- Install approval -----------------------------------------------------
+export interface InstalledApp {
+  package: string;
+  name: string;
+  first_seen: string;
+  blocked: boolean;
+}
+
+/** Apps installed on the child device (newest first), with block state. */
+export async function listInstalledApps(childId: string): Promise<InstalledApp[]> {
+  const { data, error } = await supabase.rpc("list_installed_apps", { p_child: childId });
+  if (error) throw error;
+  return (data as InstalledApp[]) ?? [];
+}
+
 // ---- Lost mode (anti-theft) -----------------------------------------------
 export async function setLost(childId: string, on: boolean, note?: string): Promise<void> {
   const { error } = await supabase.rpc("set_lost", {

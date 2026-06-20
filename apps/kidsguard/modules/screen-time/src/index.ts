@@ -50,6 +50,16 @@ export interface BlockRules {
   sleepStart: string | null;
   sleepEnd: string | null;
   locked: boolean;
+  dailyLimitMin: number; // 0 = no daily screen-time cap
+}
+
+/** Total foreground minutes used today (native UsageStats). 0 if unavailable. */
+export function usageTodayMin(): number {
+  try {
+    return ScreenTime?.usageTodayMin?.() ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** Is the app-blocker accessibility service enabled? */
@@ -131,6 +141,22 @@ export function boostAudioForSiren(): void {
   } catch {}
 }
 
+/** Open Android Private DNS settings (point at a filtering resolver). */
+export function openPrivateDnsSettings(): void {
+  try {
+    ScreenTime?.openPrivateDnsSettings?.();
+  } catch {}
+}
+
+/** Launchable apps installed on the device (for install approval). [] if N/A. */
+export function installedUserApps(): { package: string; name: string }[] {
+  try {
+    return ScreenTime?.installedUserApps?.() ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /** SIM identity "MCC+MNC|operatorName", or null if no SIM / unavailable. */
 export function getSimInfo(): string | null {
   try {
@@ -161,7 +187,8 @@ export function setBlockRules(r: BlockRules): void {
       r.sleepEnabled,
       r.sleepStart,
       r.sleepEnd,
-      r.locked
+      r.locked,
+      r.dailyLimitMin
     );
   } catch {}
 }

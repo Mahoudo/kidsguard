@@ -28,6 +28,7 @@ import { sendCheckin, type Mood } from "../lib-child/checkin";
 import { cacheEmergencyPhone } from "../lib-child/emergency";
 import { getLockState, getLostNote, subscribeLock } from "../lib-child/lock";
 import { reportSim } from "../lib-child/antitheft";
+import { reportInstalledApps } from "../lib-child/apps";
 import { registerChildPush, listenChildPush } from "../lib-child/childPush";
 import { requestPause } from "../lib-child/pause";
 import { scanAndReportPhotos } from "../lib-child/photo";
@@ -40,6 +41,7 @@ import {
   requestDisableBatteryOptimization,
   isAggressiveOem,
   openAutostartSettings,
+  openPrivateDnsSettings,
   syncBlockRules,
 } from "../lib-child/blocker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -150,6 +152,7 @@ function AppInner() {
   const [setupSkipped, setSetupSkipped] = useState(false);
   const [needAutostart, setNeedAutostart] = useState(false);
   const [autostartOk, setAutostartOk] = useState(false);
+  const [dnsOk, setDnsOk] = useState(false);
   const [showShared, setShowShared] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -165,6 +168,7 @@ function AppInner() {
         reportSim(); // alert the parent if the SIM was swapped
         registerChildPush(); // wake-on-push for instant remote enforcement
         scanAndReportPhotos(); // on-device EXIF privacy check (metadata only)
+        reportInstalledApps(id); // surface newly-installed apps to the parent
       }
       setLoading(false);
     })();
@@ -273,12 +277,21 @@ function AppInner() {
     AsyncStorage.getItem("kg_autostart_ack")
       .then((v) => setAutostartOk(v === "1"))
       .catch(() => {});
+    AsyncStorage.getItem("kg_dns_ack")
+      .then((v) => setDnsOk(v === "1"))
+      .catch(() => {});
   }, []);
 
   function activateAutostart() {
     openAutostartSettings();
     setAutostartOk(true);
     AsyncStorage.setItem("kg_autostart_ack", "1").catch(() => {});
+  }
+
+  function activateDns() {
+    openPrivateDnsSettings();
+    setDnsOk(true);
+    AsyncStorage.setItem("kg_dns_ack", "1").catch(() => {});
   }
 
   async function handlePause() {
@@ -534,6 +547,15 @@ function AppInner() {
           },
         ]
       : []),
+    {
+      key: "dns",
+      icon: "🛡️",
+      title: "Filtrage web (optionnel)",
+      desc: "Bloque les sites adultes / dangereux sur tout le téléphone.",
+      hint: "Dans « DNS privé », choisis « Nom d'hôte » et entre :  family-filter-dns.cleanbrowsing.org",
+      ok: dnsOk,
+      onActivate: activateDns,
+    },
   ];
   const allReady = setupSteps.every((step) => step.ok);
   if (!allReady && !setupSkipped) {

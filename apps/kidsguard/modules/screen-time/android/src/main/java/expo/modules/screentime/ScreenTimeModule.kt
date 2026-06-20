@@ -125,6 +125,50 @@ class ScreenTimeModule : Module() {
       }
     }
 
+    // Launchable apps installed on the device (package + label), for the parent
+    // "install approval" feature. Excludes our own app. No QUERY_ALL_PACKAGES.
+    Function("installedUserApps") {
+      val ctx = appContext.reactContext
+      if (ctx == null) emptyList<Map<String, String>>()
+      else {
+        val pm = ctx.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val out = ArrayList<Map<String, String>>()
+        try {
+          for (ri in pm.queryIntentActivities(intent, 0)) {
+            val pkg = ri.activityInfo?.packageName ?: continue
+            if (pkg == ctx.packageName) continue
+            val label = ri.loadLabel(pm)?.toString() ?: pkg
+            out.add(mapOf("package" to pkg, "name" to label))
+          }
+        } catch (e: Exception) {}
+        out.distinctBy { it["package"] }
+      }
+    }
+
+    // Open Android "Private DNS" settings so the parent can point the device at
+    // a filtering resolver (e.g. CleanBrowsing Family) that blocks adult/proxy/
+    // malware domains device-wide. Falls back to the Wireless settings.
+    Function("openPrivateDnsSettings") {
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        var opened = false
+        try {
+          ctx.startActivity(Intent("android.settings.PRIVATE_DNS_SETTINGS").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          })
+          opened = true
+        } catch (e: Exception) { /* fall through */ }
+        if (!opened) {
+          try {
+            ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
+              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+          } catch (e: Exception) {}
+        }
+      }
+    }
+
     // Per-app foreground time since local midnight.
     AsyncFunction("getUsageToday") {
       val ctx = appContext.reactContext
@@ -290,7 +334,7 @@ class ScreenTimeModule : Module() {
       packages: List<String>,
       studyEnabled: Boolean, studyStart: String?, studyEnd: String?,
       sleepEnabled: Boolean, sleepStart: String?, sleepEnd: String?,
-      locked: Boolean ->
+      locked: Boolean, dailyLimitMin: Int ->
       val ctx = appContext.reactContext
       if (ctx != null) {
         ctx.getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE).edit()
@@ -302,8 +346,16 @@ class ScreenTimeModule : Module() {
           .putString("sleepStart", sleepStart)
           .putString("sleepEnd", sleepEnd)
           .putBoolean("locked", locked)
+          .putInt("dailyLimitMin", dailyLimitMin) // 0 = no cap
           .apply()
       }
+    }
+
+    // Today's total foreground minutes across user apps (excludes our own app,
+    // launcher and system UI). Used by the daily-cap enforcement.
+    Function("usageTodayMin") {
+      val ctx = appContext.reactContext
+      if (ctx == null) 0 else ScreenUsage.todayMinutes(ctx)
     }
   }
 }

@@ -31,19 +31,40 @@ import java.time.LocalTime
 class AppBlockerService : AccessibilityService() {
 
   private var overlay: View? = null
+  private var overlayCap = false
   private var lastPkg: String = ""
   private var watching = false
   private val handler = Handler(Looper.getMainLooper())
+  private var usageMin = 0
+  private var usageAt = 0L
 
-  // While locked, keep checking (independently of window events, so an UNLOCK is
-  // detected even if no app switch happens) and keep the opaque lock surface up
-  // over every app except KidsGuard itself (so its pause screen + SOS stay usable).
+  // Today's usage, recomputed at most once a minute (UsageStats is not free).
+  private fun currentUsageMin(): Int {
+    val now = System.currentTimeMillis()
+    if (now - usageAt > 60_000L) {
+      usageMin = ScreenUsage.todayMinutes(this)
+      usageAt = now
+    }
+    return usageMin
+  }
+
+  // Why the device should be blocked right now: "lock" (parent), "cap" (daily
+  // screen-time reached), or null (free). A lock always wins.
+  private fun blockReason(prefs: android.content.SharedPreferences): String? {
+    if (prefs.getBoolean("locked", false)) return "lock"
+    val limit = prefs.getInt("dailyLimitMin", 0)
+    if (limit > 0 && currentUsageMin() >= limit) return "cap"
+    return null
+  }
+
+  // While blocked, keep checking (independently of window events, so a release is
+  // detected even if no app switch happens) and keep the opaque surface up over
+  // every app except KidsGuard itself (so its screen + SOS stay usable).
   private val lockWatcher = object : Runnable {
     override fun run() {
-      val locked = getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE)
-        .getBoolean("locked", false)
-      if (!locked) { hideLockOverlay(); watching = false; return }
-      if (lastPkg == packageName) hideLockOverlay() else showLockOverlay()
+      val reason = blockReason(getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE))
+      if (reason == null) { hideLockOverlay(); watching = false; return }
+      if (lastPkg == packageName) hideLockOverlay() else showLockOverlay(reason == "cap")
       handler.postDelayed(this, 1200)
     }
   }
@@ -78,18 +99,18 @@ class AppBlockerService : AccessibilityService() {
     ) return
 
     val prefs = getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE)
-    val locked = prefs.getBoolean("locked", false)
     val blocked = prefs.getStringSet("blocked", emptySet()) ?: emptySet()
-    Log.d("KGBlock", "evt pkg=$pkg locked=$locked blockedN=${blocked.size}")
+    val reason = blockReason(prefs)
+    Log.d("KGBlock", "evt pkg=$pkg reason=$reason blockedN=${blocked.size}")
 
-    // When locked: cover the foreground app with an opaque accessibility overlay
-    // (works without a PIN and without background-activity-launch). The watcher
-    // keeps it up and removes it on unlock; lockDevice() additionally engages the
-    // real keyguard on PIN-protected devices.
-    if (locked) {
+    // When locked OR the daily screen-time cap is reached: cover the foreground
+    // app with an opaque accessibility overlay (works without a PIN and without
+    // background-activity-launch). The watcher keeps it up and removes it when
+    // released; lockDevice() also engages the keyguard on PIN-protected devices.
+    if (reason != null) {
       ensureWatching()
-      showLockOverlay()
-      lockDevice()
+      showLockOverlay(reason == "cap")
+      if (reason == "lock") lockDevice()
     } else if (inFocusWindow(prefs) || blocked.contains(pkg)) {
       performGlobalAction(GLOBAL_ACTION_HOME)
     }
@@ -107,8 +128,13 @@ class AppBlockerService : AccessibilityService() {
   // Full-screen opaque lock surface. Tapping it opens KidsGuard so the child can
   // still reach the SOS button. TYPE_ACCESSIBILITY_OVERLAY needs no extra
   // permission (the accessibility service grants it) and sits above every app.
-  private fun showLockOverlay() {
-    if (overlay != null) return
+  private fun showLockOverlay(isCap: Boolean = false) {
+    // Already showing with the right reason? keep it. If the reason changed
+    // (lock <-> cap), rebuild so the message matches.
+    if (overlay != null) {
+      if (overlayCap == isCap) return
+      hideLockOverlay()
+    }
     try {
       val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
       val root = LinearLayout(this).apply {
@@ -119,16 +145,21 @@ class AppBlockerService : AccessibilityService() {
         isClickable = true
         setOnClickListener { launchKidsGuard() }
       }
-      root.addView(TextView(this).apply { text = "🦁"; textSize = 64f; gravity = Gravity.CENTER })
       root.addView(TextView(this).apply {
-        text = "Téléphone en pause"
+        text = if (isCap) "⏳" else "🦁"; textSize = 64f; gravity = Gravity.CENTER
+      })
+      root.addView(TextView(this).apply {
+        text = if (isCap) "Temps d'écran terminé" else "Téléphone en pause"
         setTextColor(Color.parseColor("#16132E"))
         textSize = 26f
         gravity = Gravity.CENTER
         setPadding(0, 24, 0, 8)
       })
       root.addView(TextView(this).apply {
-        text = "Tes parents l'ont mis en pause.\nAppuie ici en cas d'urgence (SOS)."
+        text = if (isCap)
+          "Tu as utilisé tout ton temps d'écran du jour.\nAppuie ici en cas d'urgence (SOS)."
+        else
+          "Tes parents l'ont mis en pause.\nAppuie ici en cas d'urgence (SOS)."
         setTextColor(Color.parseColor("#7C7896"))
         textSize = 15f
         gravity = Gravity.CENTER
@@ -142,6 +173,7 @@ class AppBlockerService : AccessibilityService() {
       )
       wm.addView(root, lp)
       overlay = root
+      overlayCap = isCap
     } catch (e: Exception) {
       Log.d("KGBlock", "overlay add failed: ${e.message}")
     }
