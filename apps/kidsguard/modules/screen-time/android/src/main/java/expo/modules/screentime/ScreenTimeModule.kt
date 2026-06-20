@@ -2,6 +2,7 @@ package expo.modules.screentime
 
 import android.app.AppOpsManager
 import android.app.admin.DevicePolicyManager
+import android.media.AudioManager
 import android.app.usage.UsageStatsManager
 import android.content.ComponentName
 import android.content.Context
@@ -104,6 +105,23 @@ class ScreenTimeModule : Module() {
             })
           } catch (e: Exception) {}
         }
+      }
+    }
+
+    // Force media + alarm volume to max so the "ring to find the phone" siren is
+    // actually audible even if the child turned the volume down or to silent.
+    Function("boostAudioForSiren") {
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        try {
+          am.setStreamVolume(
+            AudioManager.STREAM_MUSIC, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
+        } catch (e: Exception) {}
+        try {
+          am.setStreamVolume(
+            AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+        } catch (e: Exception) {}
       }
     }
 

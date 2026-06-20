@@ -35,6 +35,7 @@
         "FOREGROUND_SERVICE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
+        "MODIFY_AUDIO_SETTINGS",
         "android.permission.PACKAGE_USAGE_STATS"
       ]
     },

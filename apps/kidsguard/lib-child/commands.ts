@@ -1,6 +1,7 @@
 import { Vibration } from "react-native";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { supabase } from "./supabase";
+import { boostAudioForSiren } from "../modules/screen-time";
 
 let channel: ReturnType<typeof supabase.channel> | null = null;
 let player: AudioPlayer | null = null;
@@ -8,6 +9,9 @@ let stopTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function playSiren() {
   try {
+    // Crank media + alarm volume to max so the siren is audible even if the
+    // child muted/lowered the volume (this was the "doesn't ring" cause).
+    boostAudioForSiren();
     // Play even when the phone is on silent.
     await setAudioModeAsync({ playsInSilentMode: true });
     if (!player) {
@@ -17,10 +21,13 @@ async function playSiren() {
     player.volume = 1.0;
     player.seekTo(0);
     player.play();
+    console.log("[KGsiren] playing");
   } catch (e) {
-    console.warn("siren play failed", e);
+    console.warn("[KGsiren] play failed", e);
   }
-  Vibration.vibrate([0, 800, 400, 800, 400, 800], true);
+  try {
+    Vibration.vibrate([0, 800, 400, 800, 400, 800], true);
+  } catch {}
 }
 
 function stopSiren() {

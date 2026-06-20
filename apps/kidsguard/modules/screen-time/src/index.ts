@@ -124,6 +124,13 @@ export function openAutostartSettings(): void {
   } catch {}
 }
 
+/** Force media + alarm volume to max so the find-my-phone siren is audible. */
+export function boostAudioForSiren(): void {
+  try {
+    ScreenTime?.boostAudioForSiren?.();
+  } catch {}
+}
+
 /** SIM identity "MCC+MNC|operatorName", or null if no SIM / unavailable. */
 export function getSimInfo(): string | null {
   try {
