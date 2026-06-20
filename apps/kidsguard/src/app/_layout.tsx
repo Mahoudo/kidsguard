@@ -1,6 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ScrollView, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -48,15 +49,20 @@ export default function RootLayout() {
     setRole(r);
   };
 
-  if (role === undefined) return <View style={{ flex: 1, backgroundColor: '#FFF6F0' }} />;
-  if (role === null) return <RoleChooser onChoose={choose} />;
-  if (role === 'child') return <ChildAgent />;
+  // SafeAreaProvider must wrap everything so SafeAreaView edges (e.g. the
+  // Activité tab's top inset) get real values — without it insets are 0 and
+  // content renders under the status bar (the "cut off" header bug).
+  let content: ReactNode;
+  if (role === undefined) content = <View style={{ flex: 1, backgroundColor: '#FFF6F0' }} />;
+  else if (role === null) content = <RoleChooser onChoose={choose} />;
+  else if (role === 'child') content = <ChildAgent />;
+  else
+    content = (
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AnimatedSplashOverlay />
+        <AppTabs />
+      </ThemeProvider>
+    );
 
-  // Parent: the normal tabbed dashboard (expo-router navigator).
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
-  );
+  return <SafeAreaProvider>{content}</SafeAreaProvider>;
 }
