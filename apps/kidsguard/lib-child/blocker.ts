@@ -61,18 +61,27 @@ export async function syncBlockRules(force = false): Promise<void> {
     const [limitsRes, focusRes, childRes, pauseRes] = await Promise.all([
       supabase.from("app_limits").select("package,blocked").eq("child_id", childId),
       supabase.rpc("my_focus"),
-      supabase.from("children").select("locked,at_school").eq("id", childId).maybeSingle(),
+      // CRITICAL read: select ONLY columns that always exist. Adding an optional
+      // column here (e.g. at_school) makes the whole select fail on a DB where
+      // that migration hasn't run yet -> data null -> lock silently never applied
+      // (this exact drift cost a week to debug). Keep locked isolated.
+      supabase.from("children").select("locked").eq("id", childId).maybeSingle(),
       supabase.rpc("my_pause", { p_child: childId }),
     ]);
 
     const isLocked = !!(childRes.data as any)?.locked;
-    console.log(
-      "[KGsync] child=" + childId +
-      " lockedRaw=" + JSON.stringify((childRes.data as any)?.locked) +
-      " childErr=" + (childRes.error?.message ?? "none") +
-      " pause=" + JSON.stringify(pauseRes.data) +
-      " atSchool=" + JSON.stringify((childRes.data as any)?.at_school)
-    );
+
+    // at_school (auto-school) is OPTIONAL — fetch it best-effort so a missing
+    // column never breaks enforcement.
+    let atSchool = false;
+    try {
+      const sch = await supabase
+        .from("children")
+        .select("at_school")
+        .eq("id", childId)
+        .maybeSingle();
+      atSchool = !!(sch.data as any)?.at_school;
+    } catch {}
 
     // An active, parent-granted pause suspends enforcement — UNLESS the parent
     // has locked the device. A lock always wins over a pause (a parent locking
@@ -96,8 +105,7 @@ export async function syncBlockRules(force = false): Promise<void> {
       .filter((l: any) => l.blocked)
       .map((l: any) => l.package as string);
     const f: any = (focusRes.data as any[])?.[0] ?? {};
-    // Auto school mode: while inside a school zone, Études is on all day.
-    const atSchool = !!(childRes.data as any)?.at_school;
+    // Auto school mode (atSchool computed best-effort above): Études on all day.
     setBlockRules({
       packages,
       studyEnabled: atSchool || !!f.study_enabled,
