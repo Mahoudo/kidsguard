@@ -5,9 +5,19 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import java.time.LocalTime
 
 /**
@@ -20,10 +30,40 @@ import java.time.LocalTime
  */
 class AppBlockerService : AccessibilityService() {
 
+  private var overlay: View? = null
+  private var lastPkg: String = ""
+  private var watching = false
+  private val handler = Handler(Looper.getMainLooper())
+
+  // While locked, keep checking (independently of window events, so an UNLOCK is
+  // detected even if no app switch happens) and keep the opaque lock surface up
+  // over every app except KidsGuard itself (so its pause screen + SOS stay usable).
+  private val lockWatcher = object : Runnable {
+    override fun run() {
+      val locked = getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE)
+        .getBoolean("locked", false)
+      if (!locked) { hideLockOverlay(); watching = false; return }
+      if (lastPkg == packageName) hideLockOverlay() else showLockOverlay()
+      handler.postDelayed(this, 1200)
+    }
+  }
+
+  private fun ensureWatching() {
+    if (watching) return
+    watching = true
+    handler.post(lockWatcher)
+  }
+
+  override fun onServiceConnected() {
+    super.onServiceConnected()
+    ensureWatching() // re-arm if we (re)connect while already locked
+  }
+
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
     if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
     val pkg = event.packageName?.toString() ?: return
-    if (pkg == packageName) return
+    lastPkg = pkg
+    if (pkg == packageName) { ensureWatching(); return }
 
     // Anti-uninstall guard: if the child reaches our app-info / uninstall screen
     // (Settings or the package installer), bounce them home before they confirm.
@@ -42,26 +82,78 @@ class AppBlockerService : AccessibilityService() {
     val blocked = prefs.getStringSet("blocked", emptySet()) ?: emptySet()
     Log.d("KGBlock", "evt pkg=$pkg locked=$locked blockedN=${blocked.size}")
 
-    // When locked / lost, take over: bring KidsGuard to the front so the child
-    // sees the lock message. For focus windows or a single blocked app, a
-    // gentler bounce to the home screen is enough.
+    // When locked: cover the foreground app with an opaque accessibility overlay
+    // (works without a PIN and without background-activity-launch). The watcher
+    // keeps it up and removes it on unlock; lockDevice() additionally engages the
+    // real keyguard on PIN-protected devices.
     if (locked) {
-      // Enforcement order, most-reliable first:
-      // 1) GLOBAL_ACTION_HOME always works from an accessibility service and is
-      //    NOT subject to background-activity-launch limits — it boots the child
-      //    out of whatever app they opened. This is the dependable lock on
-      //    HyperOS/MIUI where startActivity from the background is blocked.
-      // 2) lockDevice() is a real screen lock when a PIN exists (no-op otherwise).
-      // 3) launchKidsGuard() shows the friendly lock message when allowed.
-      performGlobalAction(GLOBAL_ACTION_HOME)
+      ensureWatching()
+      showLockOverlay()
       lockDevice()
-      launchKidsGuard()
     } else if (inFocusWindow(prefs) || blocked.contains(pkg)) {
       performGlobalAction(GLOBAL_ACTION_HOME)
     }
   }
 
   override fun onInterrupt() {}
+
+  override fun onUnbind(intent: Intent?): Boolean {
+    hideLockOverlay()
+    handler.removeCallbacks(lockWatcher)
+    watching = false
+    return super.onUnbind(intent)
+  }
+
+  // Full-screen opaque lock surface. Tapping it opens KidsGuard so the child can
+  // still reach the SOS button. TYPE_ACCESSIBILITY_OVERLAY needs no extra
+  // permission (the accessibility service grants it) and sits above every app.
+  private fun showLockOverlay() {
+    if (overlay != null) return
+    try {
+      val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+      val root = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(48, 48, 48, 48)
+        setBackgroundColor(Color.parseColor("#FFF6F0"))
+        isClickable = true
+        setOnClickListener { launchKidsGuard() }
+      }
+      root.addView(TextView(this).apply { text = "🦁"; textSize = 64f; gravity = Gravity.CENTER })
+      root.addView(TextView(this).apply {
+        text = "Téléphone en pause"
+        setTextColor(Color.parseColor("#16132E"))
+        textSize = 26f
+        gravity = Gravity.CENTER
+        setPadding(0, 24, 0, 8)
+      })
+      root.addView(TextView(this).apply {
+        text = "Tes parents l'ont mis en pause.\nAppuie ici en cas d'urgence (SOS)."
+        setTextColor(Color.parseColor("#7C7896"))
+        textSize = 15f
+        gravity = Gravity.CENTER
+      })
+      val lp = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+        PixelFormat.OPAQUE
+      )
+      wm.addView(root, lp)
+      overlay = root
+    } catch (e: Exception) {
+      Log.d("KGBlock", "overlay add failed: ${e.message}")
+    }
+  }
+
+  private fun hideLockOverlay() {
+    val o = overlay ?: return
+    overlay = null
+    try {
+      (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(o)
+    } catch (e: Exception) {}
+  }
 
   private fun lockDevice(): Boolean {
     return try {
