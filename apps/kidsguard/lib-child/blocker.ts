@@ -66,6 +66,13 @@ export async function syncBlockRules(force = false): Promise<void> {
     ]);
 
     const isLocked = !!(childRes.data as any)?.locked;
+    console.log(
+      "[KGsync] child=" + childId +
+      " lockedRaw=" + JSON.stringify((childRes.data as any)?.locked) +
+      " childErr=" + (childRes.error?.message ?? "none") +
+      " pause=" + JSON.stringify(pauseRes.data) +
+      " atSchool=" + JSON.stringify((childRes.data as any)?.at_school)
+    );
 
     // An active, parent-granted pause suspends enforcement — UNLESS the parent
     // has locked the device. A lock always wins over a pause (a parent locking
