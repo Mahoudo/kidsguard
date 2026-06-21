@@ -6,7 +6,24 @@ export const ICE_CONFIG = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    // TODO: add a TURN server for cross-network reliability, e.g.
-    // { urls: "turn:your.turn.server:3478", username: "user", credential: "pass" },
+    // Free public TURN (Metered OpenRelay) — relays media when the two devices
+    // are on DIFFERENT networks (mobile data / separate wifi), where STUN alone
+    // fails. Fine for testing/MVP; for production create your own free Metered
+    // account (https://dashboard.metered.ca) and use your own credentials.
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
 };
