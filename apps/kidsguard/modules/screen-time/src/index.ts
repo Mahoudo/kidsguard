@@ -187,8 +187,8 @@ export function setBlockRules(r: BlockRules): void {
       r.sleepEnabled,
       r.sleepStart,
       r.sleepEnd,
-      r.locked,
-      r.dailyLimitMin
+      r.locked
     );
+    ScreenTime?.setDailyLimitMin?.(r.dailyLimitMin ?? 0);
   } catch {}
 }

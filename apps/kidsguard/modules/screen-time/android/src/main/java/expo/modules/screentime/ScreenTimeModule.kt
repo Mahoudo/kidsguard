@@ -334,7 +334,7 @@ class ScreenTimeModule : Module() {
       packages: List<String>,
       studyEnabled: Boolean, studyStart: String?, studyEnd: String?,
       sleepEnabled: Boolean, sleepStart: String?, sleepEnd: String?,
-      locked: Boolean, dailyLimitMin: Int ->
+      locked: Boolean ->
       val ctx = appContext.reactContext
       if (ctx != null) {
         ctx.getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE).edit()
@@ -346,7 +346,17 @@ class ScreenTimeModule : Module() {
           .putString("sleepStart", sleepStart)
           .putString("sleepEnd", sleepEnd)
           .putBoolean("locked", locked)
-          .putInt("dailyLimitMin", dailyLimitMin) // 0 = no cap
+          .apply()
+      }
+    }
+
+    // Daily screen-time cap in minutes (0 = none). Separate from setBlockRules
+    // because Expo's Function DSL caps typed lambdas at 8 args.
+    Function("setDailyLimitMin") { dailyLimitMin: Int ->
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        ctx.getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE).edit()
+          .putInt("dailyLimitMin", dailyLimitMin)
           .apply()
       }
     }
