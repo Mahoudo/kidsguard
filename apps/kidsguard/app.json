@@ -36,6 +36,8 @@
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
         "MODIFY_AUDIO_SETTINGS",
+        "CAMERA",
+        "RECORD_AUDIO",
         "android.permission.PACKAGE_USAGE_STATS"
       ]
     },
@@ -65,7 +67,8 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true,
