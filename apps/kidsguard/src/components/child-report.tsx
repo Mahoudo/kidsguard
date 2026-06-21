@@ -224,7 +224,7 @@ export function ChildReport({ childId, childName, onClose }: Props) {
           <ActivityIndicator size="large" color={th.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <View style={[st.scoreCard, { borderColor: score.color }]}>
             <View style={st.scoreTop}>
               <View style={[st.scoreBadge, { backgroundColor: score.color }]}>
@@ -423,7 +423,7 @@ export function ChildReport({ childId, childName, onClose }: Props) {
 
 function makeStyles(t: Theme) {
   return StyleSheet.create({
-    overlay: { position: "absolute", inset: 0, backgroundColor: t.bg },
+    overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: t.bg },
     head: {
       flexDirection: "row",
       justifyContent: "space-between",
