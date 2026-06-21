@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   BackHandler,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -210,6 +211,7 @@ export function ChildReport({ childId, childName, onClose }: Props) {
   const mapCenter: [number, number] = mapPt ? [mapPt.lng, mapPt.lat] : [-3.9039, 5.3747];
 
   return (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
     <SafeAreaView style={st.overlay} edges={["top", "bottom"]}>
       <View style={st.head}>
         <TouchableOpacity onPress={onClose} style={st.back}>
@@ -418,12 +420,13 @@ export function ChildReport({ childId, childName, onClose }: Props) {
         </ScrollView>
       )}
     </SafeAreaView>
+    </Modal>
   );
 }
 
 function makeStyles(t: Theme) {
   return StyleSheet.create({
-    overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: t.bg },
+    overlay: { flex: 1, backgroundColor: t.bg },
     head: {
       flexDirection: "row",
       justifyContent: "space-between",
