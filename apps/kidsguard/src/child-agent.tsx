@@ -29,6 +29,8 @@ import { cacheEmergencyPhone } from "../lib-child/emergency";
 import { getLockState, getLostNote, subscribeLock } from "../lib-child/lock";
 import { reportSim } from "../lib-child/antitheft";
 import { reportInstalledApps } from "../lib-child/apps";
+import { useChildStream } from "./lib-rtc/useChildStream";
+import { RTCView } from "react-native-webrtc";
 import { registerChildPush, listenChildPush } from "../lib-child/childPush";
 import { requestPause } from "../lib-child/pause";
 import { scanAndReportPhotos } from "../lib-child/photo";
@@ -155,6 +157,21 @@ function AppInner() {
   const [dnsOk, setDnsOk] = useState(false);
   const [showShared, setShowShared] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
+
+  // Baby monitor (video). Capture starts only after the child accepts.
+  const stream = useChildStream(childId);
+  useEffect(() => {
+    if (!stream.pendingRequest) return;
+    Alert.alert(
+      "Tes parents veulent te voir 📹",
+      "Acceptes-tu de partager ta caméra maintenant ?",
+      [
+        { text: "Refuser", style: "cancel", onPress: stream.decline },
+        { text: "Accepter", onPress: stream.accept },
+      ]
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.pendingRequest]);
 
   useEffect(() => {
     (async () => {
@@ -588,6 +605,23 @@ function AppInner() {
           : "Le partage est en pause ⏸️"}
       </Text>
 
+      {stream.streaming && (
+        <View style={s.liveBox}>
+          <Text style={s.liveTxt}>🔴 Diffusion vidéo en cours</Text>
+          {stream.localStream && (
+            <RTCView
+              streamURL={(stream.localStream as any).toURL()}
+              style={s.livePreview}
+              objectFit="cover"
+              mirror
+            />
+          )}
+          <TouchableOpacity onPress={stream.stop} style={s.liveStop}>
+            <Text style={s.liveStopTxt}>Arrêter la diffusion</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <TouchableOpacity style={s.sos} onPress={handleSos} activeOpacity={0.85}>
         <Text style={s.sosTxt}>SOS</Text>
         <Text style={s.sosSub}>en cas de danger</Text>
@@ -785,6 +819,26 @@ const s = StyleSheet.create({
   },
   sosTxt: { color: "#fff", fontSize: 46, fontWeight: "900", letterSpacing: 2 },
   sosSub: { color: "#fff", fontSize: 13, fontWeight: "600", marginTop: 2, opacity: 0.95 },
+  liveBox: {
+    width: "100%",
+    backgroundColor: "#FFE8EA",
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: C.sos,
+  },
+  liveTxt: { color: C.sos, fontWeight: "800", fontSize: 15, marginBottom: 8 },
+  livePreview: { width: "100%", height: 180, borderRadius: 12, backgroundColor: "#000" },
+  liveStop: {
+    backgroundColor: C.sos,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 10,
+  },
+  liveStopTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
   checkCard: {
     backgroundColor: C.card,
     borderRadius: 22,

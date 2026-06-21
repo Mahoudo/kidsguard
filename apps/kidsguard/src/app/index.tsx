@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Session } from "@supabase/supabase-js";
 import { MapPanel, type MapPanelHandle } from "../components/map-panel";
 import { ChildReport } from "../components/child-report";
+import { BabyMonitor } from "../components/baby-monitor";
 import { registerForPush, presentSosAlert, presentLocalAlert } from "../../lib/push";
 import { supabase } from "../../lib/supabase";
 import { useTheme, type Theme } from "../theme";
@@ -195,6 +196,7 @@ function Dashboard() {
   const prevBatt = useRef<Record<string, number>>({});
   const [reportChild, setReportChild] = useState<ChildWithLocation | null>(null);
   const [actionChild, setActionChild] = useState<ChildWithLocation | null>(null);
+  const [babyChild, setBabyChild] = useState<ChildWithLocation | null>(null);
 
   // Detect a fresh SOS (via realtime OR poll). Vibrate + notify + alert once.
   async function checkSos(initial = false) {
@@ -301,6 +303,10 @@ function Dashboard() {
   function actReport(item: ChildWithLocation) {
     setActionChild(null);
     setReportChild(item);
+  }
+  function actBabyphone(item: ChildWithLocation) {
+    setActionChild(null);
+    setBabyChild(item);
   }
   function actDelete(item: ChildWithLocation) {
     Alert.alert(
@@ -692,6 +698,14 @@ function Dashboard() {
         />
       )}
 
+      {babyChild && (
+        <BabyMonitor
+          childId={babyChild.id}
+          childName={babyChild.name}
+          onClose={() => setBabyChild(null)}
+        />
+      )}
+
       <Modal
         visible={!!actionChild}
         transparent
@@ -717,6 +731,7 @@ function Dashboard() {
             <ActionRow s={s} icon="📹" label="Appel vidéo" onPress={() => actCall(actionChild)} />
             <ActionRow s={s} icon="🔔" label="Faire sonner le téléphone" onPress={() => actRing(actionChild)} />
             <ActionRow s={s} icon="📊" label="Rapport d'activité" onPress={() => actReport(actionChild)} />
+            <ActionRow s={s} icon="📹" label="Babyphone (vidéo)" onPress={() => actBabyphone(actionChild)} />
             <ActionRow
               s={s}
               icon={actionChild.locked ? "🔓" : "🔒"}
