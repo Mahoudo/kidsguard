@@ -34,19 +34,25 @@ export function openSignaling(
   self: "parent" | "child",
   onMessage: (msg: RtcMessage) => void
 ): Signaling {
-  const channel = supabase.channel(`rtc-${childId}`, {
+  const name = `rtc-${childId}`;
+  console.log(`[KGrtc] ${self} opening ${name}`);
+  const channel = supabase.channel(name, {
     config: { broadcast: { self: false } },
   });
 
   channel
     .on("broadcast", { event: "signal" }, ({ payload }) => {
       const msg = payload as RtcMessage;
+      console.log(`[KGrtc] ${self} recv ${msg?.event} from ${msg?.from}`);
       if (msg.from !== self) onMessage(msg); // ignore our own echoes
     })
-    .subscribe();
+    .subscribe((status) => {
+      console.log(`[KGrtc] ${self} channel ${name} -> ${status}`);
+    });
 
   return {
     send: (event, payload) => {
+      console.log(`[KGrtc] ${self} send ${event}`);
       channel.send({ type: "broadcast", event: "signal", payload: { event, from: self, payload } });
     },
     close: () => {
