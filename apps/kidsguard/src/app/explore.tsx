@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme, type Theme } from "../theme";
 import {
   fetchCheckins,
@@ -30,6 +30,7 @@ const MOOD: Record<string, string> = { happy: "😀", ok: "🙂", sad: "😟" };
 export default function AlertsScreen() {
   const t = useTheme();
   const s = makeStyles(t);
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Item[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -97,7 +98,7 @@ export default function AlertsScreen() {
   }
 
   return (
-    <SafeAreaView style={[s.container, { backgroundColor: t.bg }]} edges={["top"]}>
+    <View style={[s.container, { backgroundColor: t.bg, paddingTop: insets.top }]}>
       <View style={s.header}>
         <Text style={s.h1}>Notifications</Text>
         <TouchableOpacity onPress={load} style={s.refreshBtn}>
@@ -164,7 +165,7 @@ export default function AlertsScreen() {
           );
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
