@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ScrollView, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ScrollView, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
@@ -64,5 +64,18 @@ export default function RootLayout() {
       </ThemeProvider>
     );
 
-  return <SafeAreaProvider>{content}</SafeAreaProvider>;
+  // The window/root background defaults to BLACK, which shows through the
+  // status-bar inset above each screen (the "black band" at the top). Paint the
+  // root with the theme background so any uncovered area matches the UI.
+  const rootBg = colorScheme === 'dark' ? '#0D0E1A' : '#F1F1FB';
+  return (
+    <SafeAreaProvider>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
+      />
+      <View style={{ flex: 1, backgroundColor: rootBg }}>{content}</View>
+    </SafeAreaProvider>
+  );
 }
