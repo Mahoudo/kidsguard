@@ -19,7 +19,7 @@ export function BabyMonitor({
   onClose: () => void;
 }) {
   const t = useTheme();
-  const { phase, remoteStream, start, stop } = useParentMonitor(childId);
+  const { phase, remoteStream, localStream, start, stop } = useParentMonitor(childId);
 
   useEffect(() => {
     start();
@@ -44,11 +44,21 @@ export function BabyMonitor({
 
         <View style={s.body}>
           {phase === "live" && remoteStream ? (
-            <RTCView
-              streamURL={(remoteStream as any).toURL()}
-              style={s.video}
-              objectFit="cover"
-            />
+            <View style={{ flex: 1 }}>
+              <RTCView
+                streamURL={(remoteStream as any).toURL()}
+                style={s.video}
+                objectFit="cover"
+              />
+              {localStream && (
+                <RTCView
+                  streamURL={(localStream as any).toURL()}
+                  style={s.selfPip}
+                  objectFit="cover"
+                  mirror
+                />
+              )}
+            </View>
           ) : (
             <View style={s.center}>
               <Text style={[s.status, { color: t.text }]}>
@@ -86,6 +96,17 @@ const s = StyleSheet.create({
   title: { fontSize: 17, fontWeight: "800" },
   body: { flex: 1, padding: 12 },
   video: { flex: 1, borderRadius: 16, backgroundColor: "#000" },
+  selfPip: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    width: 96,
+    height: 140,
+    borderRadius: 10,
+    backgroundColor: "#000",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
   status: { fontSize: 16, textAlign: "center", paddingHorizontal: 24 },
   retry: { borderRadius: 999, paddingVertical: 12, paddingHorizontal: 24 },

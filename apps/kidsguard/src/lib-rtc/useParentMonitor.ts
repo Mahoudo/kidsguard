@@ -3,6 +3,7 @@ import {
   RTCPeerConnection,
   RTCSessionDescription,
   RTCIceCandidate,
+  mediaDevices,
   type MediaStream,
 } from "react-native-webrtc";
 import { ICE_CONFIG } from "./peer";
@@ -18,6 +19,7 @@ type Phase = "idle" | "requesting" | "declined" | "live";
 export function useParentMonitor(childId: string | null) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const sigRef = useRef<Signaling | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -62,6 +64,14 @@ export function useParentMonitor(childId: string | null) {
       }
     });
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    // Two-way: capture the parent's camera too so the child can see them.
+    try {
+      const mine = await mediaDevices.getUserMedia({ audio: true, video: { facingMode: "user" } });
+      setLocalStream(mine);
+      mine.getTracks().forEach((t) => pc.addTrack(t, mine));
+    } catch {
+      // No camera/permission on parent -> stays one-way (still receives child).
+    }
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     sig.send("answer", answer);
@@ -78,9 +88,13 @@ export function useParentMonitor(childId: string | null) {
     sigRef.current?.send("end");
     setPhase("idle");
     setRemoteStream(null);
+    try {
+      localStream?.getTracks().forEach((t) => t.stop());
+    } catch {}
+    setLocalStream(null);
     pcRef.current?.close();
     pcRef.current = null;
   }
 
-  return { phase, remoteStream, start, stop };
+  return { phase, remoteStream, localStream, start, stop };
 }

@@ -605,17 +605,30 @@ function AppInner() {
           : "Le partage est en pause ⏸️"}
       </Text>
 
-      {stream.streaming && (
+      {(stream.streaming || stream.localStream) && (
         <View style={s.liveBox}>
           <Text style={s.liveTxt}>🔴 Diffusion vidéo en cours</Text>
-          {stream.localStream && (
-            <RTCView
-              streamURL={(stream.localStream as any).toURL()}
-              style={s.livePreview}
-              objectFit="cover"
-              mirror
-            />
-          )}
+          <View style={s.liveVideoWrap}>
+            {stream.remoteStream ? (
+              <RTCView
+                streamURL={(stream.remoteStream as any).toURL()}
+                style={s.livePreview}
+                objectFit="cover"
+              />
+            ) : (
+              <View style={[s.livePreview, s.liveWaiting]}>
+                <Text style={s.liveWaitTxt}>En attente de la vidéo des parents…</Text>
+              </View>
+            )}
+            {stream.localStream && (
+              <RTCView
+                streamURL={(stream.localStream as any).toURL()}
+                style={s.liveSelfPip}
+                objectFit="cover"
+                mirror
+              />
+            )}
+          </View>
           <TouchableOpacity onPress={stream.stop} style={s.liveStop}>
             <Text style={s.liveStopTxt}>Arrêter la diffusion</Text>
           </TouchableOpacity>
@@ -830,7 +843,21 @@ const s = StyleSheet.create({
     borderColor: C.sos,
   },
   liveTxt: { color: C.sos, fontWeight: "800", fontSize: 15, marginBottom: 8 },
-  livePreview: { width: "100%", height: 180, borderRadius: 12, backgroundColor: "#000" },
+  liveVideoWrap: { width: "100%", height: 220 },
+  livePreview: { width: "100%", height: 220, borderRadius: 12, backgroundColor: "#000" },
+  liveWaiting: { alignItems: "center", justifyContent: "center" },
+  liveWaitTxt: { color: "#fff", fontSize: 13, textAlign: "center", paddingHorizontal: 16 },
+  liveSelfPip: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    width: 76,
+    height: 110,
+    borderRadius: 8,
+    backgroundColor: "#000",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   liveStop: {
     backgroundColor: C.sos,
     borderRadius: 999,

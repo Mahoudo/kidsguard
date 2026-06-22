@@ -18,6 +18,7 @@ export function useChildStream(childId: string | null) {
   const [pendingRequest, setPendingRequest] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const sigRef = useRef<Signaling | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -67,6 +68,10 @@ export function useChildStream(childId: string | null) {
       (pc as any).addEventListener("icecandidate", (e: any) => {
         if (e.candidate) sig.send("ice", e.candidate);
       });
+      // Two-way: also receive the parent's camera (reassuring "babysitter" view).
+      (pc as any).addEventListener("track", (e: any) => {
+        if (e.streams && e.streams[0]) setRemoteStream(e.streams[0]);
+      });
 
       const offer = await pc.createOffer({});
       await pc.setLocalDescription(offer);
@@ -87,11 +92,12 @@ export function useChildStream(childId: string | null) {
     setPendingRequest(false);
     localStreamCleanup(localStream);
     setLocalStream(null);
+    setRemoteStream(null);
     pcRef.current?.close();
     pcRef.current = null;
   }
 
-  return { pendingRequest, streaming, localStream, accept, decline, stop };
+  return { pendingRequest, streaming, localStream, remoteStream, accept, decline, stop };
 }
 
 function localStreamCleanup(stream: MediaStream | null) {
