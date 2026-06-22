@@ -16,6 +16,10 @@ export default function AppTabs() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        // The scene container paints the area behind each screen, INCLUDING the
+        // status-bar inset. Without an explicit bg it's transparent and the
+        // black window shows through (the "black band" at the top). Paint it.
+        sceneStyle: { backgroundColor: '#F1F1FB' },
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.backgroundElement },
