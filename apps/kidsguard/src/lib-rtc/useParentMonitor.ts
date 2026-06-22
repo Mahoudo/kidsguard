@@ -14,7 +14,7 @@ type Phase = "idle" | "requesting" | "declined" | "live";
 /**
  * Parent side of the baby monitor. Sends a request the child must accept, then
  * receives the child's video after consent. No frame arrives before the child
- * grants consent + sends the offer.
+ * grants consent + sends the offer. Two-way: also sends the parent's camera.
  */
 export function useParentMonitor(childId: string | null) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -23,6 +23,11 @@ export function useParentMonitor(childId: string | null) {
 
   const sigRef = useRef<Signaling | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localRef = useRef<MediaStream | null>(null);
+  const remoteRef = useRef<MediaStream | null>(null);
+  const remoteSet = useRef(false);
+  const iceQueue = useRef<any[]>([]);
+  const stopRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!childId) return;
@@ -35,43 +40,100 @@ export function useParentMonitor(childId: string | null) {
           await handleOffer(msg.payload, sig);
           break;
         case "ice":
-          if (msg.payload) await pcRef.current?.addIceCandidate(new RTCIceCandidate(msg.payload));
+          await addOrQueueIce(msg.payload);
           break;
         case "end":
-          stop();
+          stopRef.current();
           break;
       }
     });
     sigRef.current = sig;
     return () => {
-      stop();
+      stopRef.current();
       sig.close();
       sigRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
+  async function addOrQueueIce(payload: any) {
+    if (!payload) return;
+    if (remoteSet.current && pcRef.current) {
+      try {
+        await pcRef.current.addIceCandidate(new RTCIceCandidate(payload));
+      } catch {}
+    } else {
+      iceQueue.current.push(payload); // PC/remote-desc not ready -> buffer
+    }
+  }
+
+  async function flushIce() {
+    const pc = pcRef.current;
+    if (!pc) return;
+    const q = iceQueue.current;
+    iceQueue.current = [];
+    for (const c of q) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(c));
+      } catch {}
+    }
+  }
+
   async function handleOffer(offer: any, sig: Signaling) {
+    if (pcRef.current) stop(); // tear down a previous session first (no leak)
     const pc = new RTCPeerConnection(await iceConfig());
     pcRef.current = pc;
+    remoteSet.current = false;
+    iceQueue.current = [];
+
     (pc as any).addEventListener("icecandidate", (e: any) => {
       if (e.candidate) sig.send("ice", e.candidate);
     });
     (pc as any).addEventListener("track", (e: any) => {
-      if (e.streams && e.streams[0]) {
-        setRemoteStream(e.streams[0]);
+      const s = e.streams && e.streams[0];
+      if (s) {
+        remoteRef.current = s;
+        setRemoteStream(s);
         setPhase("live");
       }
     });
+
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    // Two-way: capture the parent's camera too so the child can see them.
+    remoteSet.current = true;
+    await flushIce();
+
+    // Two-way: attach the parent's camera/mic to the child's reciprocal media
+    // sections (replaceTrack on the existing transceivers -> NO renegotiation).
     try {
-      const mine = await mediaDevices.getUserMedia({ audio: true, video: { facingMode: "user" } });
+      const mine = await mediaDevices.getUserMedia({
+        audio: true,
+        video: { facingMode: "user" },
+      });
+      localRef.current = mine;
       setLocalStream(mine);
-      mine.getTracks().forEach((t) => pc.addTrack(t, mine));
+      const myA = mine.getAudioTracks()[0];
+      const myV = mine.getVideoTracks()[0];
+      let usedA = false;
+      let usedV = false;
+      pc.getTransceivers().forEach((tr: any) => {
+        const kind = tr.receiver?.track?.kind;
+        if (kind === "audio" && myA && !usedA) {
+          tr.sender.replaceTrack(myA);
+          try { tr.direction = "sendrecv"; } catch {}
+          usedA = true;
+        } else if (kind === "video" && myV && !usedV) {
+          tr.sender.replaceTrack(myV);
+          try { tr.direction = "sendrecv"; } catch {}
+          usedV = true;
+        }
+      });
+      // Fallback if a section wasn't found (older RN-WebRTC): plain addTrack.
+      if (myA && !usedA) pc.addTrack(myA, mine);
+      if (myV && !usedV) pc.addTrack(myV, mine);
     } catch {
       // No camera/permission on parent -> stays one-way (still receives child).
     }
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     sig.send("answer", answer);
@@ -79,6 +141,7 @@ export function useParentMonitor(childId: string | null) {
 
   /** Ask the child to start streaming (child must accept). */
   function start() {
+    if (pcRef.current) stop(); // reset any live/stale session before re-requesting
     setPhase("requesting");
     setRemoteStream(null);
     sigRef.current?.send("request");
@@ -87,14 +150,26 @@ export function useParentMonitor(childId: string | null) {
   function stop() {
     sigRef.current?.send("end");
     setPhase("idle");
+    stopTracks(localRef.current);
+    stopTracks(remoteRef.current);
+    localRef.current = null;
+    remoteRef.current = null;
     setRemoteStream(null);
-    try {
-      localStream?.getTracks().forEach((t) => t.stop());
-    } catch {}
     setLocalStream(null);
-    pcRef.current?.close();
+    remoteSet.current = false;
+    iceQueue.current = [];
+    try {
+      pcRef.current?.close();
+    } catch {}
     pcRef.current = null;
   }
+  stopRef.current = stop;
 
   return { phase, remoteStream, localStream, start, stop };
+}
+
+function stopTracks(stream: MediaStream | null) {
+  try {
+    stream?.getTracks().forEach((t) => t.stop());
+  } catch {}
 }
