@@ -43,7 +43,8 @@ jobs:
       - name: Bump Gradle heap (avoid D8 dex OOM)
         working-directory: apps/kidsguard/android
         run: |
-          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8" >> gradle.properties
+          printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8\n' >> gradle.properties
+          echo "---- gradle.properties tail ----"; tail -5 gradle.properties
 
       - name: Install required NDK
         run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
