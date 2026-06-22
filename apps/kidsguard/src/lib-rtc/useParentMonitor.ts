@@ -6,7 +6,7 @@ import {
   mediaDevices,
   type MediaStream,
 } from "react-native-webrtc";
-import { ICE_CONFIG } from "./peer";
+import { iceConfig } from "./peer";
 import { openSignaling, type Signaling } from "./signaling";
 
 type Phase = "idle" | "requesting" | "declined" | "live";
@@ -52,7 +52,7 @@ export function useParentMonitor(childId: string | null) {
   }, [childId]);
 
   async function handleOffer(offer: any, sig: Signaling) {
-    const pc = new RTCPeerConnection(ICE_CONFIG);
+    const pc = new RTCPeerConnection(await iceConfig());
     pcRef.current = pc;
     (pc as any).addEventListener("icecandidate", (e: any) => {
       if (e.candidate) sig.send("ice", e.candidate);

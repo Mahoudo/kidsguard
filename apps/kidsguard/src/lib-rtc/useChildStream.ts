@@ -6,7 +6,7 @@ import {
   mediaDevices,
   type MediaStream,
 } from "react-native-webrtc";
-import { ICE_CONFIG } from "./peer";
+import { iceConfig } from "./peer";
 import { openSignaling, type Signaling } from "./signaling";
 
 /**
@@ -62,7 +62,7 @@ export function useChildStream(childId: string | null) {
       });
       setLocalStream(stream);
 
-      const pc = new RTCPeerConnection(ICE_CONFIG);
+      const pc = new RTCPeerConnection(await iceConfig());
       pcRef.current = pc;
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       (pc as any).addEventListener("icecandidate", (e: any) => {
