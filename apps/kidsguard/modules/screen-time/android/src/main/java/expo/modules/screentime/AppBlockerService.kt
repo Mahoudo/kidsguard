@@ -59,7 +59,7 @@ class AppBlockerService : AccessibilityService() {
 
   // While blocked, keep checking (independently of window events, so a release is
   // detected even if no app switch happens) and keep the opaque surface up over
-  // every app except KidsGuard itself (so its screen + SOS stay usable).
+  // every app except Gospion itself (so its screen + SOS stay usable).
   private val lockWatcher = object : Runnable {
     override fun run() {
       try {
@@ -139,7 +139,7 @@ class AppBlockerService : AccessibilityService() {
     return super.onUnbind(intent)
   }
 
-  // Full-screen opaque lock surface. Tapping it opens KidsGuard so the child can
+  // Full-screen opaque lock surface. Tapping it opens Gospion so the child can
   // still reach the SOS button. TYPE_ACCESSIBILITY_OVERLAY needs no extra
   // permission (the accessibility service grants it) and sits above every app.
   private fun showLockOverlay(isCap: Boolean = false) {
@@ -157,7 +157,7 @@ class AppBlockerService : AccessibilityService() {
         setPadding(48, 48, 48, 48)
         setBackgroundColor(Color.parseColor("#FFF6F0"))
         isClickable = true
-        setOnClickListener { launchKidsGuard() }
+        setOnClickListener { launchGospion() }
       }
       root.addView(TextView(this).apply {
         text = if (isCap) "⏳" else "🦁"; textSize = 64f; gravity = Gravity.CENTER
@@ -214,7 +214,7 @@ class AppBlockerService : AccessibilityService() {
     }
   }
 
-  private fun launchKidsGuard() {
+  private fun launchGospion() {
     try {
       val intent = packageManager.getLaunchIntentForPackage(packageName)
       if (intent != null) {
@@ -236,10 +236,10 @@ class AppBlockerService : AccessibilityService() {
   }
 
   // True if the currently visible window mentions our app (so we only bounce
-  // when KidsGuard itself is the uninstall/app-info target, not other apps).
+  // when Gospion itself is the uninstall/app-info target, not other apps).
   private fun windowMentionsSelf(): Boolean {
     val root = rootInActiveWindow ?: return false
-    val targets = listOf(packageName, "KidsGuard")
+    val targets = listOf(packageName, "Gospion")
     return nodeMentions(root, targets)
   }
 

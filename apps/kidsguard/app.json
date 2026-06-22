@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "KidsGuard",
+    "name": "Gospion",
     "slug": "kidsguard-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,8 +11,8 @@
       "bundleIdentifier": "com.kidsguard.app",
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "KidsGuard partage la position avec les parents.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "KidsGuard partage la position avec les parents, même en arrière-plan.",
+        "NSLocationWhenInUseUsageDescription": "Gospion partage la position avec les parents.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Gospion partage la position avec les parents, même en arrière-plan.",
         "UIBackgroundModes": ["location"]
       }
     },
@@ -62,7 +62,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "KidsGuard partage la position avec les parents, même en arrière-plan.",
+          "locationAlwaysAndWhenInUsePermission": "Gospion partage la position avec les parents, même en arrière-plan.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }

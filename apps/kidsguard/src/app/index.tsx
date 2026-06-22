@@ -114,7 +114,7 @@ function Auth() {
       <View style={s.logo}>
         <Text style={{ fontSize: 38 }}>🛡️</Text>
       </View>
-      <Text style={s.brand}>KidsGuard</Text>
+      <Text style={s.brand}>Gospion</Text>
       <Text style={s.brandSub}>Protégez ce qui compte le plus</Text>
 
       <View style={s.authCard}>

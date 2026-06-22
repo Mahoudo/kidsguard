@@ -204,7 +204,7 @@ class ScreenTimeModule : Module() {
         .sortedByDescending { it["totalMs"] as Long }
     }
 
-    // Is the KidsGuard accessibility service (app blocker) enabled?
+    // Is the Gospion accessibility service (app blocker) enabled?
     Function("isAccessibilityEnabled") {
       val ctx = appContext.reactContext ?: return@Function false
       val target = ctx.packageName + "/" + AppBlockerService::class.java.name
@@ -225,7 +225,7 @@ class ScreenTimeModule : Module() {
       }
     }
 
-    // Is KidsGuard an active device admin? (blocks casual uninstall)
+    // Is Gospion an active device admin? (blocks casual uninstall)
     Function("isAdminActive") {
       val ctx = appContext.reactContext ?: return@Function false
       val dpm = ctx.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -241,7 +241,7 @@ class ScreenTimeModule : Module() {
           putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp)
           putExtra(
             DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-            "Active la protection KidsGuard pour empêcher la désinstallation."
+            "Active la protection Gospion pour empêcher la désinstallation."
           )
           addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -256,7 +256,7 @@ class ScreenTimeModule : Module() {
       pm.isIgnoringBatteryOptimizations(ctx.packageName)
     }
 
-    // Prompt the user to exempt KidsGuard from battery optimization.
+    // Prompt the user to exempt Gospion from battery optimization.
     Function("requestDisableBatteryOptimization") {
       val ctx = appContext.reactContext
       if (ctx != null) {

@@ -9,7 +9,7 @@ export function RoleChooser({
   return (
     <View style={s.c}>
       <Text style={s.logo}>🦁</Text>
-      <Text style={s.title}>KidsGuard</Text>
+      <Text style={s.title}>Gospion</Text>
       <Text style={s.sub}>Qui utilise cet appareil ?</Text>
 
       <TouchableOpacity

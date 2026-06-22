@@ -74,7 +74,7 @@ const TRACK_OPTIONS: Location.LocationTaskOptions = {
   pausesUpdatesAutomatically: false,
   showsBackgroundLocationIndicator: true,
   foregroundService: {
-    notificationTitle: "KidsGuard actif",
+    notificationTitle: "Gospion actif",
     notificationBody: "Connecté avec tes parents",
   },
 };

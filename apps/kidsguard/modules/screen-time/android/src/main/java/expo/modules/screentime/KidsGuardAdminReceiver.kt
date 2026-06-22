@@ -11,7 +11,7 @@ import android.content.Intent
  */
 class KidsGuardAdminReceiver : DeviceAdminReceiver() {
   override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
-    return "KidsGuard protège ce téléphone. Désactiver le contrôle parental " +
+    return "Gospion protège ce téléphone. Désactiver le contrôle parental " +
       "préviendra immédiatement tes parents."
   }
 }

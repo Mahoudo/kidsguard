@@ -295,7 +295,7 @@ export function subscribeLocations(onChange: () => void) {
 
 /** Build a unique Jitsi room name for a child. */
 export function callRoom(childId: string): string {
-  return `KidsGuard-${childId.replace(/-/g, "").slice(0, 12)}-${Date.now().toString(36)}`;
+  return `Gospion-${childId.replace(/-/g, "").slice(0, 12)}-${Date.now().toString(36)}`;
 }
 
 /** Start a consented video call: notify the child + return the Jitsi room. */

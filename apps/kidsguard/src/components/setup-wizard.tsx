@@ -35,7 +35,7 @@ export function SetupWizard({
       <Text style={s.mascot}>🦁</Text>
       <Text style={s.h1}>Configuration de l'appareil</Text>
       <Text style={s.sub}>
-        Active ces réglages pour que KidsGuard protège bien l'enfant.
+        Active ces réglages pour que Gospion protège bien l'enfant.
       </Text>
 
       <View style={s.barWrap}>
