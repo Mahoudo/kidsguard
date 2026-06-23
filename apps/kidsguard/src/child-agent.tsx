@@ -867,8 +867,8 @@ const s = StyleSheet.create({
     borderColor: C.sos,
   },
   liveTxt: { color: C.sos, fontWeight: "800", fontSize: 15, marginBottom: 8 },
-  liveVideoWrap: { width: "100%", height: 220 },
-  livePreview: { width: "100%", height: 220, borderRadius: 12, backgroundColor: "#000" },
+  liveVideoWrap: { width: "100%", height: 440 },
+  livePreview: { width: "100%", height: 440, borderRadius: 12, backgroundColor: "#000" },
   liveWaiting: { alignItems: "center", justifyContent: "center" },
   liveWaitTxt: { color: "#fff", fontSize: 13, textAlign: "center", paddingHorizontal: 16 },
   liveSelfPip: {
