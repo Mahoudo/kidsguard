@@ -47,7 +47,7 @@ import {
   syncBlockRules,
 } from "../lib-child/blocker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { giveConsent, hasConsent } from "../lib-child/consent";
+import { giveConsent, hasConsent, recordServerConsent } from "../lib-child/consent";
 import { hasUsagePermission, openUsageAccessSettings, syncUsage } from "../lib-child/usage";
 
 // Direction "Indigo Soft" — child palette.
@@ -70,11 +70,18 @@ const SHARED = [
   { icon: "💚", label: "Mes check-ins", detail: "Seulement quand TU dis que tout va bien" },
   { icon: "⏱️", label: "Temps d'écran", detail: "Temps par appli (si activé)" },
   { icon: "🛡️", label: "Limites d'apps", detail: "Posées par tes parents (Focus, blocage)" },
+  { icon: "📱", label: "Mes applis installées", detail: "La liste des apps, pour validation parentale" },
+  { icon: "🖼️", label: "Infos de mes photos", detail: "Métadonnées (lieu/date) — JAMAIS l'image elle-même" },
+  { icon: "📶", label: "Ma carte SIM", detail: "Alerte à tes parents si la SIM change (anti-vol)" },
 ];
 const NOT_SHARED = [
-  "Tes SMS", "Tes appels", "Tes photos",
-  "Ton micro", "Ta caméra", "Tes messages privés",
+  "Tes SMS", "Tes appels", "Le contenu de tes photos",
+  "Tes messages privés", "Ton historique web",
 ];
+// Camera + microphone are used ONLY during a video call the child explicitly
+// accepts (the baby monitor), with a visible "diffusion" banner — never silently.
+const CAMERA_NOTE =
+  "Caméra et micro : seulement pendant un appel vidéo que TU acceptes (avec un bandeau visible). Jamais en cachette.";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -168,7 +175,10 @@ function AppInner() {
       [
         { text: "Refuser", style: "cancel", onPress: stream.decline },
         { text: "Accepter", onPress: stream.accept },
-      ]
+      ],
+      // Dismissing via the back gesture counts as a refusal (never leaves the
+      // request hanging / the camera primed without an explicit choice).
+      { cancelable: true, onDismiss: stream.decline }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.pendingRequest]);
@@ -338,6 +348,7 @@ function AppInner() {
     try {
       const id = await pairWithCode(code.trim());
       setChildId(id);
+      recordServerConsent(id); // audit H5: record consent server-side (best-effort)
       await startTracking();
       setTracking(true);
       setSetupOpen(true); // open the parent setup panel once, right after pairing
@@ -428,7 +439,11 @@ function AppInner() {
             <Text style={{ fontWeight: "800" }}>en sécurité</Text>.{"\n\n"}
             • Ils voient où tu es 📍{"\n"}
             • Tu as un bouton <Text style={{ fontWeight: "800" }}>SOS</Text> si tu as un souci 🆘{"\n"}
-            • Tu peux mettre en pause quand tu veux ⏸️
+            • Ils voient ton <Text style={{ fontWeight: "800" }}>temps d'écran</Text> et la liste de tes applis 📱{"\n"}
+            • Les <Text style={{ fontWeight: "800" }}>infos</Text> de tes photos (lieu/date), jamais l'image 🖼️{"\n"}
+            • Une alerte si ta carte SIM change 📶{"\n"}
+            • Tu peux mettre en pause quand tu veux ⏸️{"\n\n"}
+            <Text style={{ fontWeight: "800" }}>Jamais</Text> : tes SMS, appels, messages, ni l'image de tes photos.
           </Text>
         </View>
         <BigButton label="OK, j'ai compris !" color={C.green} onPress={handleConsent} />
@@ -491,6 +506,10 @@ function AppInner() {
               🚫 {x}
             </Text>
           ))}
+        </View>
+        <View style={[s.card, { borderWidth: 2, borderColor: C.sun }]}>
+          <Text style={s.shareLabel}>📹 Caméra &amp; micro</Text>
+          <Text style={s.shareDetail}>{CAMERA_NOTE}</Text>
         </View>
         <BigButton label="Retour" color={C.violet} onPress={() => setShowShared(false)} />
       </ScrollView>

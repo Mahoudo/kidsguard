@@ -30,6 +30,9 @@ export function useChildStream(childId: string | null) {
   // Remote ICE that arrives before setRemoteDescription is buffered, then flushed.
   const remoteSet = useRef(false);
   const iceQueue = useRef<any[]>([]);
+  // Dedup guard: true once a request is pending or a session is live, so a
+  // duplicate/stale "request" can't pop a second consent dialog.
+  const pendingRef = useRef(false);
   // Latest-stop ref so the signaling effect always invokes the current stop().
   const stopRef = useRef<() => void>(() => {});
 
@@ -37,9 +40,16 @@ export function useChildStream(childId: string | null) {
     if (!childId) return;
     const sig = openSignaling(childId, "child", async (msg) => {
       switch (msg.event) {
-        case "request":
+        case "request": {
+          // Drop a stale request (e.g. delivered when the app resumes long
+          // after the parent gave up) and dedup concurrent ones.
+          const ts = msg.payload?.ts;
+          if (ts && Date.now() - ts > 30_000) break;
+          if (pcRef.current || pendingRef.current) break;
+          pendingRef.current = true;
           setPendingRequest(true);
           break;
+        }
         case "answer":
           await pcRef.current?.setRemoteDescription(new RTCSessionDescription(msg.payload));
           remoteSet.current = true;
@@ -87,6 +97,7 @@ export function useChildStream(childId: string | null) {
 
   async function accept() {
     setPendingRequest(false);
+    pendingRef.current = false;
     const sig = sigRef.current;
     if (!sig) return;
     if (pcRef.current) stop(); // tear down any previous session first (no leak)
@@ -136,12 +147,14 @@ export function useChildStream(childId: string | null) {
 
   function decline() {
     setPendingRequest(false);
+    pendingRef.current = false;
     sigRef.current?.send("decline");
   }
 
   function stop() {
     setStreaming(false);
     setPendingRequest(false);
+    pendingRef.current = false;
     stopTracks(localRef.current);
     stopTracks(remoteRef.current);
     localRef.current = null;

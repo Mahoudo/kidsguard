@@ -144,7 +144,7 @@ export function useParentMonitor(childId: string | null) {
     if (pcRef.current) stop(); // reset any live/stale session before re-requesting
     setPhase("requesting");
     setRemoteStream(null);
-    sigRef.current?.send("request");
+    sigRef.current?.send("request", { ts: Date.now() }); // ts lets the child drop stale requests
   }
 
   function stop() {
