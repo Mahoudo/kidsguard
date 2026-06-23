@@ -22,12 +22,11 @@ export interface Signaling {
 }
 
 /**
- * Open an ephemeral signaling channel for a child, over Supabase Realtime
- * broadcast (no DB writes). The channel name embeds the child UUID so only the
- * paired devices use it.
- *
- * NOTE: broadcast is not RLS-gated — the child UUID is the shared secret. Harden
- * later with Realtime Authorization or a signaling table if needed.
+ * Open a signaling channel for a child, over Supabase Realtime broadcast (no DB
+ * writes). The channel name embeds the child UUID and is a PRIVATE channel:
+ * Realtime Authorization (migration 0036) gates it so only the paired parent
+ * (owns_child) or child device (is_child_device) can join/send. The child UUID
+ * is no longer the only secret (audit C3).
  */
 export function openSignaling(
   childId: string,
@@ -35,20 +34,29 @@ export function openSignaling(
   onMessage: (msg: RtcMessage) => void
 ): Signaling {
   const name = `rtc-${childId}`;
-  console.log(`[KGrtc] ${self} opening ${name}`);
+  console.log(`[KGrtc] ${self} opening ${name} (private)`);
   const channel = supabase.channel(name, {
-    config: { broadcast: { self: false } },
+    config: { broadcast: { self: false }, private: true },
   });
 
-  channel
-    .on("broadcast", { event: "signal" }, ({ payload }) => {
-      const msg = payload as RtcMessage;
-      console.log(`[KGrtc] ${self} recv ${msg?.event} from ${msg?.from}`);
-      if (msg.from !== self) onMessage(msg); // ignore our own echoes
-    })
-    .subscribe((status) => {
+  channel.on("broadcast", { event: "signal" }, ({ payload }) => {
+    const msg = payload as RtcMessage;
+    console.log(`[KGrtc] ${self} recv ${msg?.event} from ${msg?.from}`);
+    if (msg.from !== self) onMessage(msg); // ignore our own echoes
+  });
+
+  // Authorize the private channel with the current session JWT, then join.
+  (async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      await supabase.realtime.setAuth(data.session?.access_token ?? undefined);
+    } catch (e: any) {
+      console.log(`[KGrtc] ${self} setAuth failed: ${e?.message}`);
+    }
+    channel.subscribe((status) => {
       console.log(`[KGrtc] ${self} channel ${name} -> ${status}`);
     });
+  })();
 
   return {
     send: (event, payload) => {
