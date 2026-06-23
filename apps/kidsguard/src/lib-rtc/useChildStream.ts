@@ -4,7 +4,7 @@ import {
   RTCSessionDescription,
   RTCIceCandidate,
   mediaDevices,
-  type MediaStream,
+  MediaStream,
 } from "react-native-webrtc";
 import { iceConfig } from "./peer";
 import { openSignaling, type Signaling } from "./signaling";
@@ -129,12 +129,15 @@ export function useChildStream(childId: string | null) {
         if (e.candidate) sig.send("ice", e.candidate);
       });
       // Two-way: receive the parent's camera (reassuring "babysitter" view).
-      (pc as any).addEventListener("track", (e: any) => {
-        const s = e.streams && e.streams[0];
-        if (s) {
-          remoteRef.current = s;
-          setRemoteStream(s);
-        }
+      // Rebuild the remote stream from ALL receivers each time — the parent
+      // attaches via replaceTrack, so tracks arrive WITHOUT a stream
+      // (e.streams is empty); collecting the receivers' tracks shows them.
+      (pc as any).addEventListener("track", () => {
+        const tracks = pc.getReceivers().map((r: any) => r.track).filter(Boolean);
+        if (!tracks.length) return;
+        const s = new MediaStream(tracks);
+        remoteRef.current = s;
+        setRemoteStream(s);
       });
 
       const offer = await pc.createOffer({});
