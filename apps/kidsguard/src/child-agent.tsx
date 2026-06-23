@@ -601,7 +601,12 @@ function AppInner() {
         <SetupWizard
           steps={setupSteps}
           onRecheck={recheckPerms}
-          onSkip={() => setSetupSkipped(true)}
+          // Autostart is mandatory on aggressive OEMs (MIUI etc.): without it the
+          // system kills Gospion and remote lock/location stop working. No skip
+          // until it's been activated (tapping "Activer" self-attests it).
+          onSkip={
+            !needAutostart || autostartOk ? () => setSetupSkipped(true) : undefined
+          }
         />
       </View>
     );

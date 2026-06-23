@@ -75,7 +75,11 @@ export function SetupWizard({
         <TouchableOpacity onPress={onSkip} style={{ padding: 10, marginBottom: 24 }}>
           <Text style={s.skipTxt}>Passer pour l'instant →</Text>
         </TouchableOpacity>
-      ) : null}
+      ) : (
+        <Text style={s.requiredNote}>
+          🚀 Le démarrage automatique est requis pour continuer (touche « Activer » ci-dessus).
+        </Text>
+      )}
     </ScrollView>
   );
 }
@@ -104,4 +108,8 @@ const s = StyleSheet.create({
   recheckTxt: { color: "#5B4BE3", fontWeight: "700", fontSize: 14 },
   doneNote: { fontSize: 15, color: "#1FC9A0", fontWeight: "700", marginTop: 8, marginBottom: 30 },
   skipTxt: { color: "#9aa0ad", fontSize: 14, fontWeight: "600" },
+  requiredNote: {
+    fontSize: 13, color: "#b45309", fontWeight: "700", textAlign: "center",
+    marginTop: 4, marginBottom: 28, paddingHorizontal: 12, lineHeight: 19,
+  },
 });
