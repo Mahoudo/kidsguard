@@ -52,7 +52,7 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
   }));
 
   return (
-    <Map ref={mapRef} style={{ flex: 1 }} mapStyle={OSM_STYLE}>
+    <Map ref={mapRef} style={{ flex: 1 }} mapStyle={OSM_STYLE} androidView="texture">
       <Camera center={cam.center} zoom={cam.zoom} />
       {places.map((p) => (
         <Marker key={p.id} id={`zone-${p.id}`} lngLat={[p.lng, p.lat]}>
