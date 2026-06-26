@@ -3,18 +3,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ChildWithLocation, PlaceOverview } from "../../lib/api";
 
-const OSM_STYLE: any = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
+// Free OpenFreeMap vector basemap — matches the native map (map-panel.tsx).
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 export interface MapPanelHandle {
   getCenter(): Promise<[number, number] | null>;
@@ -39,7 +29,7 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
     if (!el.current) return;
     const m = new maplibregl.Map({
       container: el.current,
-      style: OSM_STYLE,
+      style: MAP_STYLE,
       center,
       zoom: 12,
     });

@@ -3,19 +3,11 @@ import { StyleSheet, Text, View } from "react-native";
 import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
 import type { ChildWithLocation, PlaceOverview } from "../../lib/api";
 
-// Free OpenStreetMap raster tiles — no API key, no billing.
-const OSM_STYLE: any = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
+// Free OpenFreeMap vector basemap — no API key, no billing, no signup.
+// "liberty" = colorful Google-Maps-like look. Swap the last path segment for
+// another style if wanted: bright (vivid) | positron (minimal light) | dark.
+// Self-hostable later (https://openfreemap.org) if the public CDN ever moves.
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 export interface MapPanelHandle {
   getCenter(): Promise<[number, number] | null>;
@@ -52,7 +44,7 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
   }));
 
   return (
-    <Map ref={mapRef} style={{ flex: 1 }} mapStyle={OSM_STYLE} androidView="texture">
+    <Map ref={mapRef} style={{ flex: 1 }} mapStyle={MAP_STYLE} androidView="texture">
       <Camera center={cam.center} zoom={cam.zoom} />
       {places.map((p) => (
         <Marker key={p.id} id={`zone-${p.id}`} lngLat={[p.lng, p.lat]}>
