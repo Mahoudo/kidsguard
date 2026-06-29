@@ -81,9 +81,113 @@ class AppBlockerService : AccessibilityService() {
     handler.post(lockWatcher)
   }
 
+  // ---- Remote poll ---------------------------------------------------------
+  // The accessibility service is the ONE component Android reliably restarts
+  // after a reboot, so it pulls the lock/block state from Supabase itself. This
+  // closes the post-reboot gap on aggressive OEMs (MIUI freezes the RN runtime
+  // and Android 10+ blocks the boot Activity start, so JS syncBlockRules never
+  // runs). Authenticated by the anon key + a per-device secret (no user JWT).
+  private val POLL_MS = 20_000L
+  private var polling = false
+
+  private val syncPoller = object : Runnable {
+    override fun run() {
+      try { pollRemoteState() } catch (e: Throwable) {
+        Log.d("KGBlock", "poll sched err: ${e.message}")
+      }
+      handler.postDelayed(this, POLL_MS)
+    }
+  }
+
+  private fun ensurePolling() {
+    if (polling) return
+    polling = true
+    handler.postDelayed(syncPoller, 2_000L) // first pull shortly after bind
+  }
+
+  private fun pollRemoteState() {
+    val cfg = getSharedPreferences("kidsguard_sync", Context.MODE_PRIVATE)
+    val url = cfg.getString("url", null) ?: return
+    val anonKey = cfg.getString("anonKey", null) ?: return
+    val childId = cfg.getString("childId", null) ?: return
+    val secret = cfg.getString("secret", null) ?: return
+    Thread {
+      var conn: java.net.HttpURLConnection? = null
+      try {
+        val body = org.json.JSONObject()
+          .put("p_child", childId).put("p_secret", secret).toString()
+        conn = (java.net.URL("$url/rest/v1/rpc/device_block_state")
+          .openConnection() as java.net.HttpURLConnection).apply {
+          connectTimeout = 8000
+          readTimeout = 8000
+          requestMethod = "POST"
+          doOutput = true
+          setRequestProperty("Content-Type", "application/json")
+          setRequestProperty("apikey", anonKey)
+          setRequestProperty("Authorization", "Bearer $anonKey")
+        }
+        conn!!.outputStream.use { it.write(body.toByteArray()) }
+        val code = conn!!.responseCode
+        if (code in 200..299) {
+          val txt = conn!!.inputStream.bufferedReader().use { it.readText() }
+          applyRemoteState(org.json.JSONObject(txt))
+        } else {
+          Log.d("KGBlock", "poll http $code")
+        }
+      } catch (e: Throwable) {
+        Log.d("KGBlock", "poll err: ${e.message}")
+      } finally {
+        try { conn?.disconnect() } catch (e: Throwable) {}
+      }
+    }.start()
+  }
+
+  // JSON null OR missing -> Kotlin null (org.json.optString would coerce to "null").
+  private fun jstr(o: org.json.JSONObject, k: String): String? =
+    if (o.isNull(k)) null else o.optString(k, null)
+
+  // Persist the effective rules the server computed, then re-evaluate the lock
+  // on the main thread (the 1.2s lockWatcher only runs while already blocking,
+  // so a fresh lock that arrives during a quiet period needs an explicit kick).
+  private fun applyRemoteState(o: org.json.JSONObject) {
+    try {
+      val pkgs = HashSet<String>()
+      o.optJSONArray("packages")?.let { arr ->
+        for (i in 0 until arr.length()) pkgs.add(arr.getString(i))
+      }
+      getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE).edit()
+        .putStringSet("blocked", pkgs)
+        .putBoolean("studyEnabled", o.optBoolean("study_enabled", false))
+        .putString("studyStart", jstr(o, "study_start"))
+        .putString("studyEnd", jstr(o, "study_end"))
+        .putBoolean("sleepEnabled", o.optBoolean("sleep_enabled", false))
+        .putString("sleepStart", jstr(o, "sleep_start"))
+        .putString("sleepEnd", jstr(o, "sleep_end"))
+        .putBoolean("locked", o.optBoolean("locked", false))
+        .putInt("dailyLimitMin", o.optInt("daily_limit_min", 0))
+        .apply()
+      handler.post {
+        try {
+          val prefs = getSharedPreferences("kidsguard_block", Context.MODE_PRIVATE)
+          val reason = blockReason(prefs)
+          if (reason != null) {
+            ensureWatching()
+            if (lastPkg != packageName) showLockOverlay(reason == "cap")
+            if (reason == "lock") lockDevice()
+          } else {
+            hideLockOverlay()
+          }
+        } catch (e: Throwable) {}
+      }
+    } catch (e: Throwable) {
+      Log.d("KGBlock", "apply err: ${e.message}")
+    }
+  }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     try { ensureWatching() } catch (e: Throwable) {} // never crash on bind
+    try { ensurePolling() } catch (e: Throwable) {}
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -135,7 +239,9 @@ class AppBlockerService : AccessibilityService() {
   override fun onUnbind(intent: Intent?): Boolean {
     hideLockOverlay()
     handler.removeCallbacks(lockWatcher)
+    handler.removeCallbacks(syncPoller)
     watching = false
+    polling = false
     return super.onUnbind(intent)
   }
 

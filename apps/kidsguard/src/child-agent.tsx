@@ -34,6 +34,7 @@ import { RTCView } from "react-native-webrtc";
 import { registerChildPush, listenChildPush } from "../lib-child/childPush";
 import { requestPause } from "../lib-child/pause";
 import { scanAndReportPhotos } from "../lib-child/photo";
+import { ensureDeviceSync } from "../lib-child/deviceSync";
 import {
   isAccessibilityEnabled,
   openAccessibilitySettings,
@@ -224,6 +225,7 @@ function AppInner() {
       setBatteryOk(isBatteryUnrestricted());
     } catch {}
     syncBlockRules();
+    ensureDeviceSync(childId); // reboot-proof: let the native service poll Supabase
     const unsubLock = subscribeLock(childId, (v) => {
       setLocked(v);
       syncBlockRules(true); // state change -> never throttle a lock

@@ -367,5 +367,36 @@ class ScreenTimeModule : Module() {
       val ctx = appContext.reactContext
       if (ctx == null) 0 else ScreenUsage.todayMinutes(ctx)
     }
+
+    // Hand the always-alive accessibility service everything it needs to poll
+    // Supabase directly, so a parent lock/unlock applies even after a reboot
+    // when the RN runtime is dead (MIUI freeze / blocked boot Activity). On the
+    // first call it mints a 256-bit per-device secret with SecureRandom.
+    Function("setSyncConfig") { url: String, anonKey: String, childId: String ->
+      val ctx = appContext.reactContext
+      if (ctx != null) {
+        val p = ctx.getSharedPreferences("kidsguard_sync", Context.MODE_PRIVATE)
+        var secret = p.getString("secret", null)
+        if (secret.isNullOrBlank()) {
+          val bytes = ByteArray(32)
+          java.security.SecureRandom().nextBytes(bytes)
+          secret = bytes.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        }
+        p.edit()
+          .putString("url", url.trimEnd('/'))
+          .putString("anonKey", anonKey)
+          .putString("childId", childId)
+          .putString("secret", secret)
+          .apply()
+      }
+    }
+
+    // The persisted device secret, so JS can register it server-side via
+    // set_device_secret. Null until setSyncConfig has run once.
+    Function("getDeviceSecret") {
+      val ctx = appContext.reactContext ?: return@Function null
+      ctx.getSharedPreferences("kidsguard_sync", Context.MODE_PRIVATE)
+        .getString("secret", null)
+    }
   }
 }

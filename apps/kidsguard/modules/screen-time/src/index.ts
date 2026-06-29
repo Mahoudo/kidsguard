@@ -176,6 +176,26 @@ export async function scanPhotoPrivacy(): Promise<{ total: number; geotagged: nu
   }
 }
 
+/**
+ * Hand the native accessibility service the config it needs to poll Supabase
+ * directly (lock/block state), so parent commands apply after a reboot even when
+ * the RN runtime is dead. Mints a per-device secret natively on first call.
+ */
+export function setSyncConfig(url: string, anonKey: string, childId: string): void {
+  try {
+    ScreenTime?.setSyncConfig?.(url, anonKey, childId);
+  } catch {}
+}
+
+/** The native per-device poll secret (null until setSyncConfig ran once). */
+export function getDeviceSecret(): string | null {
+  try {
+    return ScreenTime?.getDeviceSecret?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Push the current block rules to the native service (SharedPreferences). */
 export function setBlockRules(r: BlockRules): void {
   try {
