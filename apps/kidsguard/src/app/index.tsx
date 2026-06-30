@@ -197,6 +197,9 @@ function Dashboard() {
   const [reportChild, setReportChild] = useState<ChildWithLocation | null>(null);
   const [actionChild, setActionChild] = useState<ChildWithLocation | null>(null);
   const [babyChild, setBabyChild] = useState<ChildWithLocation | null>(null);
+  // Strict delete: parent must type the child's name to confirm (irreversible).
+  const [deletingChild, setDeletingChild] = useState<ChildWithLocation | null>(null);
+  const [delText, setDelText] = useState("");
 
   // Detect a fresh SOS (via realtime OR poll). Vibrate + notify + alert once.
   async function checkSos(initial = false) {
@@ -309,26 +312,24 @@ function Dashboard() {
     setBabyChild(item);
   }
   function actDelete(item: ChildWithLocation) {
-    Alert.alert(
-      "Supprimer l'enfant ?",
-      `Supprime définitivement ${item.name} et toutes ses données (positions, alertes, rapports). Irréversible.`,
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteChild(item.id);
-              setActionChild(null);
-              await refresh();
-            } catch (e: any) {
-              Alert.alert("Erreur", e.message);
-            }
-          },
-        },
-      ]
-    );
+    // Open the strict type-the-name modal (a single tap is too easy for an
+    // irreversible "delete the child + all their data" action).
+    setActionChild(null);
+    setDelText("");
+    setDeletingChild(item);
+  }
+  async function doDelete() {
+    const item = deletingChild;
+    if (!item) return;
+    if (delText.trim().toLowerCase() !== item.name.trim().toLowerCase()) return;
+    try {
+      await deleteChild(item.id);
+      setDeletingChild(null);
+      setDelText("");
+      await refresh();
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message);
+    }
   }
 
   async function refresh() {
@@ -749,6 +750,63 @@ function Dashboard() {
           </View>
         )}
       </Modal>
+
+      <Modal
+        visible={!!deletingChild}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeletingChild(null)}
+      >
+        <View style={s.delBackdrop}>
+          {deletingChild && (
+            <View style={s.delCard}>
+              <Text style={s.delTitle}>Supprimer {deletingChild.name} ?</Text>
+              <Text style={s.delMsg}>
+                Supprime définitivement {deletingChild.name} et TOUTES ses données
+                (positions, alertes, rapports). Action irréversible.
+              </Text>
+              <Text style={s.delHint}>
+                Tape «{" "}
+                <Text style={{ fontWeight: "800", color: t.text }}>
+                  {deletingChild.name}
+                </Text>{" "}
+                » pour confirmer :
+              </Text>
+              <TextInput
+                style={[s.input, { marginBottom: 0 }]}
+                placeholder={deletingChild.name}
+                placeholderTextColor={t.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={delText}
+                onChangeText={setDelText}
+              />
+              <View style={s.delBtnRow}>
+                <TouchableOpacity
+                  style={s.delCancel}
+                  onPress={() => setDeletingChild(null)}
+                >
+                  <Text style={s.delCancelTxt}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    s.delConfirm,
+                    delText.trim().toLowerCase() !==
+                      deletingChild.name.trim().toLowerCase() && s.dim,
+                  ]}
+                  disabled={
+                    delText.trim().toLowerCase() !==
+                    deletingChild.name.trim().toLowerCase()
+                  }
+                  onPress={doDelete}
+                >
+                  <Text style={s.delConfirmTxt}>Supprimer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -967,5 +1025,41 @@ function makeStyles(t: Theme) {
     logoutSep: { height: 1, backgroundColor: t.border, marginTop: 22, marginBottom: 4 },
     logoutBtn: { alignSelf: "center", paddingVertical: 12, paddingHorizontal: 24, marginTop: 4 },
     logoutTxt: { color: t.danger, fontWeight: "700", fontSize: 14 },
+    delBackdrop: {
+      flex: 1,
+      backgroundColor: "#00000088",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 26,
+    },
+    delCard: {
+      width: "100%",
+      maxWidth: 380,
+      backgroundColor: t.card,
+      borderRadius: 22,
+      padding: 22,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
+    delTitle: { fontSize: 19, fontWeight: "900", color: t.danger, marginBottom: 8 },
+    delMsg: { fontSize: 14, color: t.text, lineHeight: 20, marginBottom: 14 },
+    delHint: { fontSize: 13, color: t.muted, marginBottom: 8 },
+    delBtnRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+    delCancel: {
+      flex: 1,
+      paddingVertical: 13,
+      borderRadius: 12,
+      alignItems: "center",
+      backgroundColor: t.cardAlt,
+    },
+    delCancelTxt: { color: t.text, fontWeight: "700", fontSize: 15 },
+    delConfirm: {
+      flex: 1,
+      paddingVertical: 13,
+      borderRadius: 12,
+      alignItems: "center",
+      backgroundColor: t.danger,
+    },
+    delConfirmTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
   });
 }

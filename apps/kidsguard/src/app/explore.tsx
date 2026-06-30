@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme, type Theme } from "../theme";
 import {
   fetchCheckins,
+  fetchChildren,
   fetchGeofenceFeed,
   fetchSos,
   resolveSos,
@@ -23,9 +24,19 @@ import {
 type Item =
   | { kind: "geo"; id: string; at: string; child: string; dir: "enter" | "exit"; place: string }
   | { kind: "sos"; id: string; sosId: string; at: string; child: string; resolved: boolean }
-  | { kind: "check"; id: string; at: string; child: string; mood: string | null; ckind: string };
+  | { kind: "check"; id: string; at: string; child: string; mood: string | null; ckind: string }
+  | { kind: "batt"; id: string; at: string; child: string; pct: number };
 
 const MOOD: Record<string, string> = { happy: "😀", ok: "🙂", sad: "😟" };
+
+// Battery at/below this (%) surfaces an actionable "low battery" card — a dying
+// phone is the #1 parent stress, so we make it a real notification (not just the
+// transient push on the home screen). Mood stays the child's own voice; this is
+// a separate, system-driven signal.
+const LOW_BATTERY = 20;
+// Ignore stale readings: a 3-day-old "8%" is noise (the phone died or charged
+// since). Only flag a low battery seen recently.
+const BATT_FRESH_MS = 3 * 60 * 60 * 1000;
 
 export default function AlertsScreen() {
   const t = useTheme();
@@ -37,11 +48,31 @@ export default function AlertsScreen() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [geo, sos, checks] = await Promise.all([
+      const [geo, sos, checks, kids] = await Promise.all([
         fetchGeofenceFeed(100).catch(() => []),
         fetchSos(50).catch(() => []),
         fetchCheckins(50).catch(() => []),
+        fetchChildren().catch(() => []),
       ]);
+      const now = Date.now();
+      const battItems: Item[] = kids
+        .filter((k) => {
+          const b = k.last_battery_pct;
+          const seen = k.last_seen_at ?? k.located_at;
+          return (
+            b != null &&
+            b <= LOW_BATTERY &&
+            !!seen &&
+            now - new Date(seen).getTime() < BATT_FRESH_MS
+          );
+        })
+        .map((k) => ({
+          kind: "batt" as const,
+          id: "b" + k.id,
+          at: k.last_seen_at ?? k.located_at!,
+          child: k.name,
+          pct: k.last_battery_pct!,
+        }));
       const merged: Item[] = [
         ...geo.map((g) => ({
           kind: "geo" as const,
@@ -67,6 +98,7 @@ export default function AlertsScreen() {
           mood: k.mood,
           ckind: k.kind,
         })),
+        ...battItems,
       ].sort((a, b) => b.at.localeCompare(a.at));
       setItems(merged);
     } finally {
@@ -134,6 +166,22 @@ export default function AlertsScreen() {
                     <Text style={s.resolveTxt}>Résoudre</Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            );
+          }
+          if (item.kind === "batt") {
+            return (
+              <View style={[s.card, { borderColor: t.warning }]}>
+                <Text style={s.dot}>🪫</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.title}>
+                    {item.child} — batterie faible ({item.pct}%)
+                  </Text>
+                  <Text style={s.muted}>
+                    Pense à lui faire charger le téléphone ·{" "}
+                    {new Date(item.at).toLocaleString("fr-FR")}
+                  </Text>
+                </View>
               </View>
             );
           }
