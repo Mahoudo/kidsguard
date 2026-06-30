@@ -48,6 +48,27 @@ import {
   type PlaceOverview,
 } from "../../lib/api";
 
+// Relative "il y a X" — compact (s / min / h / j).
+function relTime(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h`;
+  return `${Math.floor(h / 24)} j`;
+}
+
+// 3-tier presence from last activity: online (<5 min), recent (<3 h), offline.
+type Presence = { tier: "on" | "warn" | "off"; label: string };
+function presence(lastSeen: string | null | undefined): Presence | null {
+  if (!lastSeen) return null;
+  const d = Date.now() - new Date(lastSeen).getTime();
+  if (d < 300_000) return { tier: "on", label: "🟢 En ligne" };
+  if (d < 3 * 3_600_000) return { tier: "warn", label: `🟡 Vu il y a ${relTime(d)}` };
+  return { tier: "off", label: `🔴 Hors ligne depuis ${relTime(d)}` };
+}
+
 export default function HomeScreen() {
   const t = useTheme();
   const [session, setSession] = useState<Session | null>(null);
@@ -482,6 +503,13 @@ function Dashboard() {
     ? [located[0].lng!, located[0].lat!]
     : [-4.024, 5.345];
 
+  // At-a-glance family summary for the sheet header.
+  const paired = children.filter((c) => !c.pairing_code);
+  const onlineCount = paired.filter(
+    (c) => presence(c.last_seen_at ?? c.located_at)?.tier === "on"
+  ).length;
+  const lockedCount = paired.filter((c) => c.locked).length;
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <MapPanel ref={mapRef} located={located} places={places} center={center} />
@@ -501,6 +529,16 @@ function Dashboard() {
             />
           </View>
         </View>
+
+        {paired.length > 0 && (
+          <Text style={s.familySummary}>
+            {paired.length} enfant{paired.length > 1 ? "s" : ""}
+            {onlineCount > 0 ? ` · 🟢 ${onlineCount} en ligne` : ""}
+            {lockedCount > 0
+              ? ` · 🔒 ${lockedCount} verrouillé${lockedCount > 1 ? "s" : ""}`
+              : ""}
+          </Text>
+        )}
 
         {adding && (
           <View style={s.addRow}>
@@ -527,11 +565,15 @@ function Dashboard() {
             </Text>
           }
           renderItem={({ item }) => {
-            // Heartbeat pings every ~60s; allow a couple of missed pings before
-            // showing the child as offline.
-            const online =
-              !!item.last_seen_at &&
-              Date.now() - new Date(item.last_seen_at).getTime() < 300_000;
+            // Heartbeat pings every ~60s; 3-tier presence from last activity.
+            const pres = presence(item.last_seen_at ?? item.located_at);
+            const dotColor = !pres
+              ? t.muted
+              : pres.tier === "on"
+                ? t.success
+                : pres.tier === "warn"
+                  ? t.warning
+                  : t.danger;
             const initial = item.name.trim().charAt(0).toUpperCase() || "?";
             const batt = item.last_battery_pct;
             const battColor =
@@ -545,20 +587,15 @@ function Dashboard() {
                 >
                   <View style={s.avatar}>
                     <Text style={s.avatarTxt}>{initial}</Text>
-                    <View
-                      style={[
-                        s.statusDot,
-                        { backgroundColor: online ? t.success : t.muted },
-                      ]}
-                    />
+                    <View style={[s.statusDot, { backgroundColor: dotColor }]} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.childName}>{item.name}</Text>
                     <Text style={s.childSub}>
                       {item.pairing_code
                         ? `Code : ${item.pairing_code}`
-                        : item.located_at
-                          ? `${online ? "En ligne" : "Vu"} ${new Date(item.located_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                        : pres
+                          ? pres.label
                           : "Jamais localisé"}
                     </Text>
                   </View>
@@ -733,6 +770,8 @@ function Dashboard() {
             <ActionRow s={s} icon="🔔" label="Faire sonner le téléphone" onPress={() => actRing(actionChild)} />
             <ActionRow s={s} icon="📊" label="Rapport d'activité" onPress={() => actReport(actionChild)} />
             <ActionRow s={s} icon="📹" label="Babyphone (vidéo)" onPress={() => actBabyphone(actionChild)} />
+
+            <View style={s.menuDivider} />
             <ActionRow
               s={s}
               icon={actionChild.locked ? "🔓" : "🔒"}
@@ -1061,5 +1100,13 @@ function makeStyles(t: Theme) {
       backgroundColor: t.danger,
     },
     delConfirmTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
+    familySummary: {
+      color: t.muted,
+      fontSize: 13,
+      fontWeight: "600",
+      marginTop: -4,
+      marginBottom: 12,
+    },
+    menuDivider: { height: 10 },
   });
 }

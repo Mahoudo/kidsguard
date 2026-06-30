@@ -69,10 +69,12 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
           key={c.id}
           identifier={`kid-${c.id}`}
           coordinate={{ latitude: c.lat!, longitude: c.lng! }}
-          tracksViewChanges={false}
+          anchor={{ x: 0.5, y: 0.5 }}
         >
           <View style={styles.pin}>
-            <Text style={styles.pinTxt}>🧒</Text>
+            <Text style={styles.pinTxt}>
+              {c.name?.trim().charAt(0).toUpperCase() || "?"}
+            </Text>
           </View>
         </Marker>
       ))}
@@ -82,16 +84,22 @@ export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
 
 const styles = StyleSheet.create({
   pin: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "#5B4BE3",
-    borderWidth: 3,
+    borderWidth: 2.5,
     borderColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
+    // subtle lift so the avatar reads as a pin on the map
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
-  pinTxt: { fontSize: 18 },
+  pinTxt: { fontSize: 15, fontWeight: "800", color: "#fff" },
   zoneDot: {
     width: 28,
     height: 28,

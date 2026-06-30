@@ -23,7 +23,7 @@ import {
 
 type Item =
   | { kind: "geo"; id: string; at: string; child: string; dir: "enter" | "exit"; place: string }
-  | { kind: "sos"; id: string; sosId: string; at: string; child: string; resolved: boolean }
+  | { kind: "sos"; id: string; sosId: string; at: string; child: string; resolved: boolean; resolvedAt: string | null }
   | { kind: "check"; id: string; at: string; child: string; mood: string | null; ckind: string }
   | { kind: "batt"; id: string; at: string; child: string; pct: number };
 
@@ -89,6 +89,7 @@ export default function AlertsScreen() {
           at: x.created_at,
           child: x.child_name,
           resolved: !!x.resolved_at,
+          resolvedAt: x.resolved_at ?? null,
         })),
         ...checks.map((k) => ({
           kind: "check" as const,
@@ -152,13 +153,17 @@ export default function AlertsScreen() {
         renderItem={({ item }) => {
           if (item.kind === "sos") {
             return (
-              <View style={[s.card, { borderColor: t.danger }]}>
-                <Text style={s.dot}>🆘</Text>
+              <View style={[s.card, { borderColor: item.resolved ? t.success : t.danger }]}>
+                <Text style={s.dot}>{item.resolved ? "✅" : "🆘"}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={s.title}>{item.child} a déclenché un SOS</Text>
                   <Text style={s.muted}>
                     {new Date(item.at).toLocaleString("fr-FR")}
-                    {item.resolved ? " · résolu" : ""}
+                    {item.resolved
+                      ? item.resolvedAt
+                        ? ` · ✓ résolu à ${new Date(item.resolvedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                        : " · ✓ résolu"
+                      : ""}
                   </Text>
                 </View>
                 {!item.resolved && (
