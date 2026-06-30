@@ -38,6 +38,9 @@ jobs:
 
       - name: Prebuild (generate android/)
         working-directory: apps/kidsguard
+        env:
+          # Injected into AndroidManifest by app.config.js (kept out of the repo).
+          GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
         run: npx expo prebuild -p android --no-install
 
       - name: Bump Gradle heap (avoid D8 dex OOM)

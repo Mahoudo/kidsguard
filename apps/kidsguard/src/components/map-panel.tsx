@@ -1,13 +1,10 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import type { ChildWithLocation, PlaceOverview } from "../../lib/api";
 
-// Free OpenFreeMap vector basemap — no API key, no billing, no signup.
-// "liberty" = colorful Google-Maps-like look. Swap the last path segment for
-// another style if wanted: bright (vivid) | positron (minimal light) | dark.
-// Self-hostable later (https://openfreemap.org) if the public CDN ever moves.
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+// Native Google Maps (Maps SDK for Android — free, best local coverage in CI).
+// The API key is injected at build from a CI secret (see app.config.js).
 
 export interface MapPanelHandle {
   getCenter(): Promise<[number, number] | null>;
@@ -17,48 +14,69 @@ export interface MapPanelHandle {
 interface Props {
   located: ChildWithLocation[];
   places: PlaceOverview[];
-  center: [number, number];
+  center: [number, number]; // [lng, lat]
 }
 
 export const MapPanel = forwardRef<MapPanelHandle, Props>(function MapPanel(
   { located, places, center },
   ref
 ) {
-  const mapRef = useRef<any>(null);
-  const [cam, setCam] = useState<{ center: [number, number]; zoom: number }>({
-    center,
-    zoom: 12,
-  });
+  const mapRef = useRef<MapView | null>(null);
+
   useImperativeHandle(ref, () => ({
     async getCenter() {
       try {
-        const c = await mapRef.current?.getCenter?.();
-        if (Array.isArray(c)) return [c[0], c[1]];
-        if (c) return [c.longitude ?? c.lng, c.latitude ?? c.lat];
+        const cam = await mapRef.current?.getCamera();
+        const c = cam?.center;
+        if (c) return [c.longitude, c.latitude];
       } catch {}
       return null;
     },
     centerOn(c, zoom = 15) {
-      setCam({ center: c, zoom });
+      mapRef.current?.animateCamera(
+        { center: { latitude: c[1], longitude: c[0] }, zoom },
+        { duration: 500 }
+      );
     },
   }));
 
   return (
-    <Map ref={mapRef} style={{ flex: 1 }} mapStyle={MAP_STYLE} androidView="texture">
-      <Camera center={cam.center} zoom={cam.zoom} />
+    <MapView
+      ref={mapRef}
+      provider={PROVIDER_GOOGLE}
+      style={{ flex: 1 }}
+      initialRegion={{
+        latitude: center[1],
+        longitude: center[0],
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      }}
+      toolbarEnabled={false}
+    >
       {places.map((p) => (
-        <Marker key={p.id} id={`zone-${p.id}`} lngLat={[p.lng, p.lat]}>
+        <Marker
+          key={p.id}
+          identifier={`zone-${p.id}`}
+          coordinate={{ latitude: p.lat, longitude: p.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
+        >
           <View style={styles.zoneDot} />
         </Marker>
       ))}
       {located.map((c) => (
-        <Marker key={c.id} id={`kid-${c.id}`} lngLat={[c.lng!, c.lat!]}>
+        <Marker
+          key={c.id}
+          identifier={`kid-${c.id}`}
+          coordinate={{ latitude: c.lat!, longitude: c.lng! }}
+          tracksViewChanges={false}
+        >
           <View style={styles.pin}>
             <Text style={styles.pinTxt}>🧒</Text>
           </View>
         </Marker>
       ))}
-    </Map>
+    </MapView>
   );
 });
 
